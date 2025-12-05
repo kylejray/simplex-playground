@@ -1,11 +1,11 @@
 fastapi
 uvicorn
 pydantic
-jax
+jax[cpu]
 jaxlib
 numpy
 plotly
 pyyaml
 scikit-learn
-torch
+torch --index-url https://download.pytorch.org/whl/cpu
 git+https://github.com/Astera-org/simplexity.git
