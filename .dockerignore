@@ -1,0 +1,18 @@
+# Ignore huge folders
+.venv
+venv
+frontend
+node_modules
+.git
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+
+# OS files
+.DS_Store
