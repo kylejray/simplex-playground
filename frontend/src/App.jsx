@@ -131,6 +131,9 @@ function App() {
         })
       );
 
+      // Update the UI with the normalized values
+      setMatrices(normalizedMatrices);
+
       const payload = {
         batch_size: parseInt(config.batch_size),
         sequence_len: parseInt(config.sequence_len),
