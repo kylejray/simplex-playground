@@ -5,6 +5,12 @@ WORKDIR /app
 # Install git for installing dependencies from git repositories
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
+# 1. Install CPU-only PyTorch and JAX explicitly first
+# We do this BEFORE requirements.txt to ensure these specific versions are used
+# and to prevent pip from pulling the massive GPU versions from PyPI later.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir "jax[cpu]"
+
 COPY requirements.txt .
 
 # Install dependencies
