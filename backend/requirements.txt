@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+jax
+jaxlib
+numpy
+plotly
+pyyaml
+scikit-learn
+torch
+git+https://github.com/Astera-org/simplexity.git

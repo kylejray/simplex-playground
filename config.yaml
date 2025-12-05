@@ -1,0 +1,9 @@
+batch_size: 512
+sequence_len: 50
+
+#must be 'mess3', 'simple_constrained', or 'santa'
+matrix_key: 'mess3'
+
+matrix_kwargs:
+  x: .1
+  a: .7

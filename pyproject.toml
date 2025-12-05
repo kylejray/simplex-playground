@@ -1,0 +1,56 @@
+[project]
+name = "example"
+version = "0.1.0"
+description = "This is an example repo for a Simplex research project"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "simplexity @ git+https://github.com/Astera-org/simplexity.git",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "jax",
+    "jaxlib",
+    "numpy",
+    "plotly",
+    "pyyaml",
+    "scikit-learn",
+    "torch"
+]
+
+[project.optional-dependencies]
+dev = ["jaxtyping", "nbqa", "pyright", "pytest", "pytest-cov", "ruff"]
+gpu = ["jax[cuda12]>=0.6.0"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+ignore = [
+    "D100",   # undocumented-public-module
+    "D105",   # Missing docstring in magic method
+    "D107",   # Missing docstring in __init__
+    "SIM108", # Use the ternary operator
+]
+select = [
+    "A",   # flake8-builtins
+    "B",   # flake8-bugbear
+    "D",   # pydocstyle https://www.pydocstyle.org/en/stable/error_codes.html
+    "E",   # pycodestyle
+    "F",   # Pyflakes
+    "I",   # isort
+    "PT",  # flake8-pytest-style
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["D"]
+"*.ipynb" = ["D"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
