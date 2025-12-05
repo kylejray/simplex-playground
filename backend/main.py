@@ -30,8 +30,6 @@ class PresetRequest(BaseModel):
     kwargs: dict = {}
 
 def get_matrices_array(key, kwargs):
-    if key == "simple_constrained":
-        return matrices.simple_constrained(**kwargs)
     if key == 'mess3':
         return mess3(**kwargs)
     if key == 'left_right_mix':

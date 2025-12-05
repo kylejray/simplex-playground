@@ -298,7 +298,6 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             style={{ padding: '5px 10px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
             <option value="mess3">Mess 3 (Chaotic)</option>
-            <option value="simple_constrained">Simple Constrained</option>
             <option value="left_right_mix">Left/Right Mix</option>
             <option value="custom">Custom</option>
           </select>
