@@ -42,8 +42,8 @@ const STYLES = {
 
 function App() {
   const [config, setConfig] = useState({
-    batch_size: 512,
-    sequence_len: 50,
+    batch_size: 128,
+    sequence_len: 25,
     preset: 'mess3',
     x: 0.1,
     y: 0.7,

@@ -21,8 +21,8 @@ app.add_middleware(
 )
 
 class GenerateRequest(BaseModel):
-    batch_size: int = 512
-    sequence_len: int = 50
+    batch_size: int = 128
+    sequence_len: int = 25
     matrices: list
 
 class PresetRequest(BaseModel):
@@ -32,8 +32,6 @@ class PresetRequest(BaseModel):
 def get_matrices_array(key, kwargs):
     if key == "simple_constrained":
         return matrices.simple_constrained(**kwargs)
-    if key == 'santa':
-        return matrices.santa(**kwargs)
     if key == 'mess3':
         return mess3(**kwargs)
     if key == 'left_right_mix':

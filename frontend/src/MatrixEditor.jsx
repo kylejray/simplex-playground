@@ -291,16 +291,16 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <label style={{ fontWeight: 600, color: '#555' }}>Preset:</label>
-          <select 
+                    <select 
             name="preset" 
             value={config.preset} 
             onChange={handleConfigChange}
             style={{ padding: '5px 10px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
-            <option value="santa">santa</option>
-            <option value="mess3">mess3</option>
-            <option value="left_right_mix">left_right_mix</option>
-            <option value="custom">Custom (Manual)</option>
+            <option value="mess3">Mess 3 (Chaotic)</option>
+            <option value="simple_constrained">Simple Constrained</option>
+            <option value="left_right_mix">Left/Right Mix</option>
+            <option value="custom">Custom</option>
           </select>
         </div>
 
