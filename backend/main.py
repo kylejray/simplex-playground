@@ -6,6 +6,10 @@ from hmm import HiddenMarkovModel
 from matrices import mess3
 import matrices
 import json
+import os
+import sys
+
+print("Starting FastAPI application...", file=sys.stderr)
 
 app = FastAPI()
 
