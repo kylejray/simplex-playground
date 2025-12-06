@@ -9,19 +9,11 @@ import json
 
 app = FastAPI()
 
-# Configure CORS with explicit origins
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000",
-    "https://simplex-playground.vercel.app",
-]
-
+# Configure CORS to allow all origins (public API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex="https://.*\.vercel\.app",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
