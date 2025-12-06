@@ -1,89 +1,39 @@
-import jax
-import jax.numpy as jnp
+import numpy as np
 
-def simple_constrained(x: float, y: float) -> jnp.ndarray:
+def mess3(x: float, a: float) -> np.ndarray:
     """
-    Creates a set of 2 transition matrices based on parameters x and y.
-    Returns shape (2, 3, 3).
-    """
-    T0 = jnp.array(
-        [
-            [x, x, 1-y],
-            [y, y, 1-y],
-            [y, 1-y, x],
-        ])
-    
-    T1 = 1 - T0
-
-    return jnp.array([T0, T1]) / 3
-
-def fractal_constrained(x: float, y: float) -> jnp.ndarray:
-    """
-    Creates a set of 3 transition matrices based on parameters x and y.
+    Creates a transition matrix for the Mess3 Process.
     Returns shape (3, 3, 3).
     """
-    x9 = x * 9
-    y9 = y * 9
-    normalization_factor = 9 * 2.4
+    b = (1 - a) / 2
+    y = 1 - 2 * x
 
-    T0 = jnp.array(
+    ay = a * y
+    bx = b * x
+    by = b * y
+    ax = a * x
+
+    return np.array(
         [
-            [1, 1+y9, 1+x9],
-            [1, 1, 1],
-            [1+y9, 1, 1+x9],
-        ])
-    
-    T1 = jnp.array(
-        [
-            [1+x9, 1+y9, 1],
-            [1+x9, 1, 1+y9],
-            [1, 1, 1],
-        ])
+            [
+                [ay, bx, bx],
+                [ax, by, bx],
+                [ax, bx, by],
+            ],
+            [
+                [by, ax, bx],
+                [bx, ay, bx],
+                [bx, ax, by],
+            ],
+            [
+                [by, bx, ax],
+                [bx, by, ax],
+                [bx, bx, ay],
+            ],
+        ]
+    )
 
-    T2 = jnp.array(
-        [
-            [1, 1, 1],
-            [1, 1+x9, 1+y9],
-            [1+y9, 1+x9, 1],
-        ])
-
-    return jnp.array([T0, T1, T2]) / normalization_factor
-
-def santa() -> jnp.ndarray:
-    """
-    Returns the 'santa' preset matrices.
-    Returns shape (3, 3, 3).
-    """
-    v = .0611111
-    w = .211111
-    x = .0111111
-    y = .161111
-    z = .311111
-
-    T0 = jnp.array(
-        [
-            [x, w, y],
-            [z, v, x],
-            [y, x, y],
-        ])
-    
-    T1 = jnp.array(
-        [
-            [y, v, x],
-            [x, w, x],
-            [x, x, y],
-        ])
-
-    T2 = jnp.array(
-        [
-            [y, v, y],
-            [x, v, z],
-            [y, z, x],
-        ])
-
-    return jnp.array([T0, T1, T2])
-
-def left_right_mix() -> jnp.ndarray:
+def left_right_mix() -> np.ndarray:
     """
     Returns the 'left_right_mix' preset matrices.
     Symbol 0: Deterministic cycle A->B->C->A
@@ -93,7 +43,7 @@ def left_right_mix() -> jnp.ndarray:
     """
     # Symbol 0: A->B->C->A (Deterministic cycle)
     # Weight = 1.0
-    T0 = jnp.array([
+    T0 = np.array([
         [0.0, 1.0, 0.0],  # A -> B
         [0.0, 0.0, 1.0],  # B -> C
         [1.0, 0.0, 0.0]   # C -> A
@@ -101,7 +51,7 @@ def left_right_mix() -> jnp.ndarray:
 
     # Symbol 1: A->C->B->A (Opposite deterministic cycle)
     # Weight = 0.6 (mostly), one is 0.3 to break symmetry
-    T1 = jnp.array([
+    T1 = np.array([
         [0.0, 0.0, 0.3],   # A -> C
         [0.6, 0.0, 0.0],   # B -> A
         [0.0, 0.6, 0.0]    # C -> B
@@ -116,10 +66,10 @@ def left_right_mix() -> jnp.ndarray:
     val_A = 0.4 / 3.0
     val_others = 0.1 / 3.0
     
-    T2 = jnp.array([
+    T2 = np.array([
         [val_A, val_A, val_A],          # From A (needs more weight to balance T1's 0.3 vs 0.6)
         [val_others, val_others, val_others], # From B
         [val_others, val_others, val_others]  # From C
     ])
 
-    return jnp.array([T0, T1, T2])
+    return np.array([T0, T1, T2])

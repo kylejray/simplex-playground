@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const GRAPH_WIDTH = 450;
 const GRAPH_HEIGHT = 400;
@@ -14,7 +14,60 @@ const COLORS = {
   highlightBorder: '#c8e6c9'
 };
 
-const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymbol, onSymbolChange, prevBelief }) => {
+const NormalizedInput = ({ rawValue, totalSum, onChange, style, className }) => {
+    const [localValue, setLocalValue] = useState(null);
+    
+    // Calculate normalized value (probability)
+    const normValue = totalSum === 0 ? 0 : rawValue / totalSum;
+    
+    // Use local value if editing, otherwise formatted normalized value
+    const displayValue = localValue !== null ? localValue : (Math.round(normValue * 100) / 100).toString();
+
+    const commit = (val) => {
+        const newP = parseFloat(val);
+        if (isNaN(newP)) {
+            setLocalValue(null);
+            return;
+        }
+        
+        // Back-calculate raw strength: x = p * (S_others) / (1 - p)
+        const s_others = totalSum - rawValue;
+        let newRaw;
+        
+        if (s_others <= 0.00001) {
+             // If no other weights, we can't really set a probability < 1 unless we set raw=0
+             newRaw = newP > 0 ? 1 : 0; 
+        } else {
+             // Cap probability to avoid division by zero or negative weights
+             const p = Math.min(Math.max(newP, 0), 0.99);
+             newRaw = (p * s_others) / (1 - p);
+        }
+        
+        onChange(newRaw.toString());
+        setLocalValue(null);
+    };
+
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            style={style}
+            className={className}
+            value={displayValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    commit(e.target.value);
+                    e.target.blur();
+                }
+            }}
+            autoComplete="off"
+        />
+    );
+};
+
+const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymbol, onSymbolChange, prevBelief, nextBelief }) => {
   
   const handleCellChange = (row, col, value) => {
     const newMatrices = JSON.parse(JSON.stringify(matrices));
@@ -217,49 +270,16 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
           markerEnd="url(#arrowhead)" 
           style={{ transition: 'all 0.2s' }}
         />
-        <foreignObject x={labelX - 25} y={labelY - 14} width="50" height="28">
+                <foreignObject x={labelX - 25} y={labelY - 14} width="50" height="28">
           {prevBelief ? (
-             <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>
-                {displayValue === 0 ? "0%" : (displayValue * 100 < 1 ? "<1%" : Math.round(displayValue * 100) + "%")}
-             </div>
+             null
           ) : (
-          <input 
-            type="text" 
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => handleCellChange(from, to, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                let currentVal = parseFloat(value);
-                if (isNaN(currentVal)) currentVal = 0;
-                
-                let newVal;
-                // Increase/decrease by 20%
-                const factor = 0.2; 
-
-                if (e.key === 'ArrowUp') {
-                    if (currentVal === 0) {
-                        newVal = 0.1; // Jump start from 0
-                    } else {
-                        newVal = currentVal * (1 + factor);
-                    }
-                } else {
-                    // ArrowDown
-                    newVal = currentVal * (1 - factor);
-                    // Snap to 0 if very small
-                    if (newVal < 0.01) newVal = 0;
-                }
-
-                // Round to avoid floating point errors, keep reasonable precision
-                const rounded = Math.round(newVal * 10000) / 10000;
-                // Convert back to string for the handler
-                handleCellChange(from, to, rounded.toString());
-              }
-            }}
+          <NormalizedInput 
+            rawValue={parseFloat(value) || 0}
+            totalSum={stateSums[from]}
+            onChange={(newVal) => handleCellChange(from, to, newVal)}
             style={inputStyle}
             className="matrix-input"
-            autoComplete="off"
           />
           )}
         </foreignObject>
@@ -272,11 +292,12 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
       display: 'flex', 
       flexDirection: 'column', 
       gap: '20px', 
-      marginTop: '20px',
-      background: 'white',
+      background: 'white', 
       padding: '20px',
       borderRadius: '12px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+      boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+      height: '100%',
+      boxSizing: 'border-box'
     }}>
       
       {/* Top Bar: Preset Selection & Parameters */}
@@ -297,7 +318,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             onChange={handleConfigChange}
             style={{ padding: '5px 10px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
-            <option value="mess3">Mess 3 (Chaotic)</option>
+            <option value="mess3">Mess 3</option>
             <option value="left_right_mix">Left/Right Mix</option>
             <option value="custom">Custom</option>
           </select>
@@ -306,26 +327,32 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
         {config.preset === 'mess3' && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontWeight: 600, color: '#555' }}>X:</label>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>X:</label>
               <input 
-                type="number" 
-                step="any" 
+                type="range" 
+                min="0" 
+                max="0.5" 
+                step="0.01" 
                 name="x" 
                 value={config.x} 
                 onChange={handleConfigChange} 
-                style={{ width: '80px', padding: '5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                style={{ width: '120px' }}
               />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.x}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontWeight: 600, color: '#555' }}>A:</label>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>A:</label>
               <input 
-                type="number" 
-                step="any" 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
                 name="a" 
                 value={config.a} 
                 onChange={handleConfigChange} 
-                style={{ width: '80px', padding: '5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                style={{ width: '120px' }}
               />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.a}</span>
             </div>
           </>
         )}
@@ -337,16 +364,15 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             color: '#666', 
             fontStyle: 'italic' 
         }}>
-            Values are "strengths" & automatically normalized.
+            input values are normalized probabilities
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px', alignItems: 'center' }}>
         
         {/* Visual Graph */}
         <div style={{ 
-          flex: 2, 
-          minWidth: `${GRAPH_WIDTH}px`, 
+          width: '100%',
           display: 'flex',
           justifyContent: 'center',
           padding: '20px',
@@ -356,7 +382,8 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             <div style={{ 
                 position: 'absolute',
                 top: '10px',
-                left: '10px',
+                right: '10px',
+                maxWidth: '200px',
                 padding: '8px 12px',
                 background: COLORS.highlightBg,
                 border: `1px solid ${COLORS.highlightBorder}`,
@@ -365,11 +392,11 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 fontWeight: 'bold',
                 fontSize: '0.9em',
                 zIndex: 10,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                textAlign: 'right'
             }}>
-                Total Likelihood (Z): {(totalFlow * 100).toFixed(1)}%
-                <div style={{ fontWeight: 'normal', fontSize: '0.85em', marginTop: '4px', lineHeight: '1.4' }}>
-                    Sum of incoming arrows = Next Belief State
+                <div style={{ fontWeight: 'normal', fontSize: '0.85em', lineHeight: '1.4' }}>
+                    arrow weight depicts the importance of each channel in the belief state update
                 </div>
             </div>
         )}
@@ -400,7 +427,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 <text 
                   x={positions[idx].x} 
                   y={positions[idx].y} 
-                  dy={prevBelief ? "-0.2em" : ".35em"} 
+                  dy={prevBelief ? "-0.5em" : ".35em"} 
                   textAnchor="middle" 
                   fontWeight="bold" 
                   fontSize="18"
@@ -412,7 +439,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                   <text
                     x={positions[idx].x}
                     y={positions[idx].y}
-                    dy="1.2em"
+                    dy="1.0em"
                     textAnchor="middle"
                     fontSize="12"
                     fill="#666"

@@ -2,7 +2,4 @@ fastapi
 uvicorn
 pydantic
 numpy
-plotly
-pyyaml
-scikit-learn
-git+https://github.com/Astera-org/simplexity.git
+

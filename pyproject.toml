@@ -5,22 +5,14 @@ description = "This is an example repo for a Simplex research project"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "simplexity @ git+https://github.com/Astera-org/simplexity.git",
     "fastapi",
     "uvicorn",
     "pydantic",
-    "jax",
-    "jaxlib",
-    "numpy",
-    "plotly",
-    "pyyaml",
-    "scikit-learn",
-    "torch"
+    "numpy"
 ]
 
 [project.optional-dependencies]
-dev = ["jaxtyping", "nbqa", "pyright", "pytest", "pytest-cov", "ruff"]
-gpu = ["jax[cuda12]>=0.6.0"]
+dev = ["nbqa", "pyright", "pytest", "pytest-cov", "ruff"]
 
 [tool.ruff]
 line-length = 120

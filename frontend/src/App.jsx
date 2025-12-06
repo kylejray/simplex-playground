@@ -20,7 +20,7 @@ const STYLES = {
     borderRadius: '12px', 
     border: '1px solid #eee',
     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-    height: '430px',
+    maxHeight: '400px',
     overflow: 'auto'
   },
   wordItem: {
@@ -40,6 +40,31 @@ const STYLES = {
   }
 };
 
+// Helper for Simplex Projection
+const simplexToPolygon = (coords) => {
+  // Vertices of equilateral triangle
+  const v = [
+    [0, 0],
+    [1, 0],
+    [0.5, Math.sqrt(3)/2]
+  ];
+  
+  // coords is [p1, p2, p3]
+  // Result is weighted sum of vertices
+  const x = coords[0]*v[0][0] + coords[1]*v[1][0] + coords[2]*v[2][0];
+  const y = coords[0]*v[0][1] + coords[1]*v[1][1] + coords[2]*v[2][1];
+  return [x, y];
+};
+
+const getRGBString = (coords) => {
+    // Simple mapping of 3 components to RGB
+    // coords are 0-1
+    const r = Math.floor(coords[0] * 255);
+    const g = Math.floor(coords[1] * 255);
+    const b = Math.floor(coords[2] * 255);
+    return `rgba(${r}, ${g}, ${b}, 0.8)`;
+};
+
 function App() {
   const [config, setConfig] = useState({
     batch_size: 128,
@@ -54,14 +79,15 @@ function App() {
   const [matrices, setMatrices] = useState(DEFAULT_MATRICES);
 
   const [selectedSymbol, setSelectedSymbol] = useState(0);
-  const [plotData, setPlotData] = useState(null);
   const [words, setWords] = useState([]);
   const [beliefStates, setBeliefStates] = useState([]);
+  const [flatBeliefs, setFlatBeliefs] = useState([]);
   const [initialState, setInitialState] = useState(null);
   const [hoveredBelief, setHoveredBelief] = useState(null);
   const [prevBelief, setPrevBelief] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [viewMode, setViewMode] = useState('2d'); // '2d' or '3d'
 
   // Fetch preset matrices when preset or params change
   useEffect(() => {
@@ -100,15 +126,20 @@ function App() {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Auto-generate when config changes (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      generateData();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [config, matrices]); // Re-run when config or matrices change
+
+  const generateData = async () => {
     setLoading(true);
     setError(null);
     try {
       // Normalize matrices (strengths -> probabilities)
-      // Normalization must happen across all symbols for a given state.
-      // Sum of outgoing transitions from state i (across all symbols) must be 1.
-      
       const numSymbols = matrices.length;
       const numStates = matrices[0].length;
       
@@ -131,9 +162,6 @@ function App() {
         })
       );
 
-      // Update the UI with the normalized values
-      setMatrices(normalizedMatrices);
-
       const payload = {
         batch_size: parseInt(config.batch_size),
         sequence_len: parseInt(config.sequence_len),
@@ -141,10 +169,12 @@ function App() {
       };
 
       const response = await axios.post(`${API_URL}/generate`, payload);
-      setPlotData(response.data.plot);
+      
       setWords(response.data.words);
       setBeliefStates(response.data.belief_states);
       setInitialState(response.data.initial_state);
+      setFlatBeliefs(response.data.flat_beliefs);
+      
     } catch (err) {
       console.error(err);
       setError('Failed to fetch data: ' + (err.response?.data?.detail || err.message));
@@ -153,21 +183,223 @@ function App() {
     }
   };
 
-  return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Simplex Generator</h1>
-      <form onSubmit={handleSubmit} style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        
-        <MatrixEditor 
-            matrices={matrices} 
-            onChange={setMatrices} 
-            config={config}
-            onConfigChange={handleChange}
-            selectedSymbol={selectedSymbol}
-            onSymbolChange={setSelectedSymbol}
-            prevBelief={prevBelief}
-        />
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    generateData();
+  };
 
+  const getPlotData = () => {
+    if (!flatBeliefs || flatBeliefs.length === 0) return null;
+
+    const colors = flatBeliefs.map(b => getRGBString(b));
+    const data = [];
+    
+    // Use a constant uirevision to preserve camera state across updates
+    const layout = {
+        uirevision: 'true',
+        margin: { l: 0, r: 0, b: 0, t: 0 },
+        height: 500,
+        width: 500,
+        showlegend: false
+    };
+
+    // Main scatter plot
+    if (viewMode === '3d') {
+      data.push({
+        type: 'scatter3d',
+        mode: 'markers',
+        x: flatBeliefs.map(b => b[0]),
+        y: flatBeliefs.map(b => b[1]),
+        z: flatBeliefs.map(b => b[2]),
+        marker: {
+          size: 3,
+          color: colors,
+          opacity: 0.8
+        },
+        name: 'Belief States'
+      });
+
+      layout.scene = {
+        xaxis: { title: 'A', range: [0, 1], autorange: false },
+        yaxis: { title: 'B', range: [0, 1], autorange: false },
+        zaxis: { title: 'C', range: [0, 1], autorange: false },
+        aspectmode: 'cube'
+      };
+
+      // Highlight vector
+      if (prevBelief && hoveredBelief) {
+        // Line
+        data.push({
+            type: 'scatter3d',
+            mode: 'lines',
+            x: [prevBelief[0], hoveredBelief[0]],
+            y: [prevBelief[1], hoveredBelief[1]],
+            z: [prevBelief[2], hoveredBelief[2]],
+            line: { color: 'black', width: 5 },
+            name: 'Transition'
+        });
+        
+        // Cone for arrow head
+        // Only add if there is movement
+        const dx = hoveredBelief[0] - prevBelief[0];
+        const dy = hoveredBelief[1] - prevBelief[1];
+        const dz = hoveredBelief[2] - prevBelief[2];
+        const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        
+        if (len > 0.001) {
+            data.push({
+                type: 'cone',
+                x: [hoveredBelief[0]],
+                y: [hoveredBelief[1]],
+                z: [hoveredBelief[2]],
+                u: [dx],
+                v: [dy],
+                w: [dz],
+                sizemode: 'absolute',
+                sizeref: 0.1,
+                anchor: 'tip',
+                colorscale: [[0, 'black'], [1, 'black']],
+                showscale: false
+            });
+        }
+      }
+
+      return { data, layout };
+    } else {
+      // 2D Simplex
+      const points = flatBeliefs.map(simplexToPolygon);
+      
+      // Triangle boundary
+      const v = [[0, 0], [1, 0], [0.5, Math.sqrt(3)/2], [0,0]];
+      
+      data.push({
+        type: 'scatter',
+        mode: 'markers',
+        x: points.map(p => p[0]),
+        y: points.map(p => p[1]),
+        marker: {
+          size: 4,
+          color: colors,
+        },
+        showlegend: false
+      });
+
+      // Boundary
+      data.push({
+        type: 'scatter',
+        mode: 'lines',
+        x: v.map(p => p[0]),
+        y: v.map(p => p[1]),
+        line: { color: 'black', width: 1 },
+        hoverinfo: 'skip',
+        showlegend: false
+      });
+
+      layout.xaxis = { showgrid: false, zeroline: false, showticklabels: false };
+      layout.yaxis = { showgrid: false, zeroline: false, showticklabels: false, scaleanchor: 'x' };
+      layout.margin = { l: 20, r: 20, b: 20, t: 20 };
+
+      // Highlight vector
+      if (prevBelief && hoveredBelief) {
+        const p1 = simplexToPolygon(prevBelief);
+        const p2 = simplexToPolygon(hoveredBelief);
+        
+        // Use annotation for arrow
+        layout.annotations = [{
+            x: p2[0],
+            y: p2[1],
+            ax: p1[0],
+            ay: p1[1],
+            xref: 'x',
+            yref: 'y',
+            axref: 'x',
+            ayref: 'y',
+            showarrow: true,
+            arrowhead: 2,
+            arrowsize: 1,
+            arrowwidth: 2,
+            arrowcolor: 'black'
+        }];
+      }
+
+      return { data, layout };
+    }
+  };
+
+  const plotData = getPlotData();
+
+  return (
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1600px', margin: '0 auto' }}>
+      <h1>Simplex Generator</h1>
+      
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'stretch', marginBottom: '30px' }}>
+        
+        {/* Left Column: Plot */}
+        <div style={{ flex: 1, minWidth: '500px' }}>
+            <div style={{ 
+                background: 'white', 
+                padding: '10px', 
+                borderRadius: '12px', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                marginBottom: '20px'
+            }}>
+                <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0 }}>Belief Space</h3>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                        <input 
+                            type="checkbox" 
+                            checked={viewMode === '2d'} 
+                            onChange={(e) => setViewMode(e.target.checked ? '2d' : '3d')} 
+                        />
+                        Show 2D Simplex
+                    </label>
+                </div>
+                
+                {plotData ? (
+                    <Plot
+                        data={plotData.data}
+                        layout={plotData.layout}
+                        style={{ width: '100%', height: '500px' }}
+                        config={{ displayModeBar: false }}
+                    />
+                ) : (
+                    <div style={{ 
+                        height: '500px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        background: '#f9f9f9', 
+                        color: '#999',
+                        borderRadius: '8px'
+                    }}>
+                        Generate data to see visualization
+                    </div>
+                )}
+            </div>
+
+            {/* Belief Visualizer (Single State) */}
+            <div>
+                <BeliefVisualizer probabilities={hoveredBelief || initialState || [0.33, 0.33, 0.33]} />
+            </div>
+        </div>
+
+        {/* Right Column: Matrix Editor */}
+        <div style={{ flex: 1, minWidth: '500px' }}>
+             <MatrixEditor 
+                matrices={matrices} 
+                onChange={setMatrices} 
+                config={config}
+                onConfigChange={handleChange}
+                selectedSymbol={selectedSymbol}
+                onSymbolChange={setSelectedSymbol}
+                prevBelief={prevBelief}
+                nextBelief={hoveredBelief}
+            />
+        </div>
+      </div>
+
+      {/* Controls Row */}
+      <form onSubmit={handleSubmit} style={{ marginBottom: '30px' }}>
         <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -179,24 +411,24 @@ function App() {
             flexWrap: 'wrap'
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontWeight: 'bold', color: '#555' }}>Batch Size: </label>
-              <input 
+            <label style={{ fontWeight: 'bold', color: '#555' }}>Batch Size: </label>
+            <input 
                 type="number" 
                 name="batch_size" 
                 value={config.batch_size} 
                 onChange={handleChange} 
                 style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }}
-              />
+            />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontWeight: 'bold', color: '#555' }}>Sequence Length: </label>
-              <input 
+            <label style={{ fontWeight: 'bold', color: '#555' }}>Sequence Length: </label>
+            <input 
                 type="number" 
                 name="sequence_len" 
                 value={config.sequence_len} 
                 onChange={handleChange} 
                 style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }}
-              />
+            />
             </div>
             
             <div style={{ flex: 1 }}></div>
@@ -216,76 +448,56 @@ function App() {
                     transition: 'background 0.2s'
                 }}
             >
-              {loading ? 'Generating...' : 'Generate Simulation'}
+            {loading ? 'Generating...' : 'Generate Simulation'}
             </button>
         </div>
       </form>
 
-      {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
+      {error && <div style={{ color: 'red', marginBottom: '20px' }}>{error}</div>}
 
-      {plotData && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Top Row: Visualizer and Words */}
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-                {/* Belief Visualizer (Left) */}
-                <div style={{ flex: '0 0 auto' }}>
-                    <BeliefVisualizer probabilities={hoveredBelief} />
-                </div>
-
-                {/* Words Display (Right) */}
-                <div style={STYLES.wordListContainer}>
-                    <h3 style={{ marginTop: 0, fontSize: '18px', color: '#333', marginBottom: '10px' }}>Generated Words</h3>
-                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px', fontStyle: 'italic' }}>
-                        Hover over characters to see belief state
-                    </div>
-                    <ul style={{ paddingLeft: '0', margin: 0, listStyle: 'none' }}>
-                        {words.map((fullWord, idx) => (
-                            <li key={idx} style={STYLES.wordItem}>
-                                {fullWord.split('').map((char, charIdx) => (
-                                    <span 
-                                        key={charIdx}
-                                        onMouseEnter={() => {
-                                            if (beliefStates[idx] && beliefStates[idx][charIdx]) {
-                                                setHoveredBelief(beliefStates[idx][charIdx]);
-                                                
-                                                // Determine previous belief
-                                                if (charIdx === 0) {
-                                                    setPrevBelief(initialState);
-                                                } else {
-                                                    setPrevBelief(beliefStates[idx][charIdx - 1]);
-                                                }
-                                            }
-                                            // Update selected symbol in Matrix Editor
-                                            const symbolIdx = parseInt(char);
-                                            if (!isNaN(symbolIdx) && symbolIdx >= 0 && symbolIdx < matrices.length) {
-                                                setSelectedSymbol(symbolIdx);
-                                            }
-                                        }}
-                                        onMouseLeave={() => {
-                                            setHoveredBelief(null);
-                                            setPrevBelief(null);
-                                        }}
-                                        style={STYLES.charSpan}
-                                        className="word-char"
-                                    >
-                                        {char}
-                                    </span>
-                                ))}
-                            </li>
+      {/* Output Row */}
+      {words.length > 0 && (
+        <div style={STYLES.wordListContainer}>
+            <h3 style={{ marginTop: 0, fontSize: '18px', color: '#333', marginBottom: '10px' }}>Generated Words</h3>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px', fontStyle: 'italic' }}>
+                Hover over characters to see belief state
+            </div>
+            <ul style={{ paddingLeft: '0', margin: 0, listStyle: 'none' }}>
+                {words.map((fullWord, idx) => (
+                    <li key={idx} style={STYLES.wordItem}>
+                        {fullWord.split('').map((char, charIdx) => (
+                            <span 
+                                key={charIdx}
+                                onMouseEnter={() => {
+                                    if (beliefStates[idx] && beliefStates[idx][charIdx]) {
+                                        setHoveredBelief(beliefStates[idx][charIdx]);
+                                        
+                                        // Determine previous belief
+                                        if (charIdx === 0) {
+                                            setPrevBelief(initialState);
+                                        } else {
+                                            setPrevBelief(beliefStates[idx][charIdx - 1]);
+                                        }
+                                    }
+                                    // Update selected symbol in Matrix Editor
+                                    const symbolIdx = parseInt(char);
+                                    if (!isNaN(symbolIdx) && symbolIdx >= 0 && symbolIdx < matrices.length) {
+                                        setSelectedSymbol(symbolIdx);
+                                    }
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredBelief(null);
+                                    setPrevBelief(null);
+                                }}
+                                style={STYLES.charSpan}
+                                className="word-char"
+                            >
+                                {char}
+                            </span>
                         ))}
-                    </ul>
-                </div>
-            </div>
-
-            {/* Bottom Row: Plot */}
-            <div style={{ border: '1px solid #ccc', padding: '10px', width: '100%' }}>
-              <Plot
-                data={plotData.data}
-                layout={plotData.layout}
-                style={{ width: '100%', height: '600px' }}
-                useResizeHandler={true}
-              />
-            </div>
+                    </li>
+                ))}
+            </ul>
         </div>
       )}
     </div>
