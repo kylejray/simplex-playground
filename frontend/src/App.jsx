@@ -10,7 +10,9 @@ const DEFAULT_MATRICES = [
   [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+
+console.log('Current API_URL:', API_URL);
 
 const STYLES = {
   wordListContainer: {
@@ -177,7 +179,8 @@ function App() {
       
     } catch (err) {
       console.error(err);
-      setError('Failed to fetch data: ' + (err.response?.data?.detail || err.message));
+      const errorMsg = err.response?.data?.detail || err.message;
+      setError(`Failed to fetch data from ${API_URL}: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
