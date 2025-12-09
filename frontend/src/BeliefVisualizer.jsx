@@ -2,19 +2,19 @@ import React, { useState, useEffect } from 'react';
 
 const VIS_WIDTH = 450;
 const VIS_HEIGHT = 390;
-const VIS_PADDING = 50;
+const VIS_PADDING = 40; // Reduced padding
 
 const COLORS = {
   A: 'rgb(255, 0, 0)',
   B: 'rgb(0, 255, 0)',
   C: 'rgb(0, 0, 255)',
-  background: '#f8f9fa',
+  background: 'transparent', // Transparent by default for SVG
   stroke: '#ccc',
   text: '#222',
   subText: '#555'
 };
 
-const BeliefVisualizer = ({ probabilities }) => {
+const BeliefVisualizer = ({ probabilities, minimal = false, showButton = true }) => {
   const [history, setHistory] = useState([]);
 
   useEffect(() => {
@@ -53,15 +53,16 @@ const BeliefVisualizer = ({ probabilities }) => {
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center',
-      background: 'white',
-      padding: '20px',
-      borderRadius: '12px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+      background: minimal ? 'transparent' : 'white',
+      padding: minimal ? '0' : '20px',
+      borderRadius: minimal ? '0' : '12px',
+      boxShadow: minimal ? 'none' : '0 4px 12px rgba(0,0,0,0.08)',
       width: '100%',
+      height: '100%',
       boxSizing: 'border-box'
     }}>
-      <h4 style={{ margin: '0 0 15px 0', color: '#444', fontSize: '18px', fontWeight: 600 }}>Belief State Visualization</h4>
-      <svg width={VIS_WIDTH} height={VIS_HEIGHT} style={{ overflow: 'visible' }}>
+      {!minimal && <h4 style={{ margin: '0 0 15px 0', color: '#444', fontSize: '18px', fontWeight: 600 }}>Belief State Visualization</h4>}
+      <svg viewBox={`0 0 ${VIS_WIDTH} ${VIS_HEIGHT}`} width="100%" height="100%" style={{ overflow: 'visible' }}>
         {/* Triangle Background */}
         <path 
           d={`M ${A.x} ${A.y} L ${B.x} ${B.y} L ${C.x} ${C.y} Z`} 
@@ -81,7 +82,7 @@ const BeliefVisualizer = ({ probabilities }) => {
             <circle 
               cx={node.pos.x} 
               cy={node.pos.y} 
-              r={15 + node.val * 25} 
+              r={25 + node.val * 35} 
               fill={node.color} 
               opacity={0.2 + node.val * 0.6}
             />
@@ -89,21 +90,21 @@ const BeliefVisualizer = ({ probabilities }) => {
             <text 
               x={node.pos.x} 
               y={node.pos.y} 
-              dy="6" 
+              dy="10" 
               textAnchor="middle" 
               fill={COLORS.text} 
               fontWeight="bold" 
-              fontSize="16"
+              fontSize="28"
             >
               {node.label}
             </text>
             {/* Value Text */}
             <text 
               x={node.pos.x} 
-              y={node.pos.y + (node.pos.y > VIS_HEIGHT/2 ? 35 : -35)} 
+              y={node.pos.y + (node.pos.y > VIS_HEIGHT/2 ? 60 : -60)} 
               textAnchor="middle" 
               fill={COLORS.subText} 
-              fontSize="14"
+              fontSize="24"
               fontWeight="500"
             >
               {(node.val * 100).toFixed(0)}%
@@ -119,7 +120,7 @@ const BeliefVisualizer = ({ probabilities }) => {
               key={i}
               cx={coords.x} 
               cy={coords.y} 
-              r="4" 
+              r="6" 
               fill={getColor(p)} 
               opacity="0.6"
             />
@@ -130,7 +131,7 @@ const BeliefVisualizer = ({ probabilities }) => {
         <circle 
           cx={x} 
           cy={y} 
-          r="10" 
+          r="14" 
           fill={beliefColor} 
           stroke="black" 
           strokeWidth="2"
@@ -138,21 +139,27 @@ const BeliefVisualizer = ({ probabilities }) => {
         />
       </svg>
       
-      <button 
-        onClick={() => setHistory([])}
-        style={{
-          marginTop: '10px',
-          padding: '6px 12px',
-          fontSize: '14px',
-          cursor: 'pointer',
-          background: '#fff',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          color: '#555'
-        }}
-      >
-        Clear History
-      </button>
+      {showButton && (
+        <button 
+          onClick={() => setHistory([])}
+          style={{
+            marginTop: '15px',
+            padding: '8px 16px',
+            background: '#f0f0f0',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            color: '#666',
+            fontSize: '14px',
+            fontWeight: 500,
+            transition: 'background 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.background = '#e0e0e0'}
+          onMouseOut={(e) => e.target.style.background = '#f0f0f0'}
+        >
+          Clear History
+        </button>
+      )}
     </div>
   );
 };

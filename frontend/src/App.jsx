@@ -22,7 +22,7 @@ const STYLES = {
     borderRadius: '12px', 
     border: '1px solid #eee',
     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-    maxHeight: '400px',
+    maxHeight: '600px',
     overflow: 'auto'
   },
   wordItem: {
@@ -72,9 +72,9 @@ function App() {
     batch_size: 128,
     sequence_len: 25,
     preset: 'mess3',
-    x: 0.1,
+    x: 0.15,
     y: 0.7,
-    a: 0.7
+    a: 0.6
   });
   
   // Default 3 symbols, 3 states (Identity matrices)
@@ -206,9 +206,10 @@ function App() {
     // Use a constant uirevision to preserve camera state across updates
     const layout = {
         uirevision: 'true',
-        margin: { l: 0, r: 0, b: 0, t: 0 },
-        height: 500,
-        width: 500,
+        // Push plot to bottom-left to make room for inset
+        margin: { l: 0, r: 200, b: 0, t: 100 },
+        height: 600,
+        autosize: true,
         showlegend: false
     };
 
@@ -306,7 +307,8 @@ function App() {
 
       layout.xaxis = { showgrid: false, zeroline: false, showticklabels: false };
       layout.yaxis = { showgrid: false, zeroline: false, showticklabels: false, scaleanchor: 'x' };
-      layout.margin = { l: 20, r: 20, b: 20, t: 20 };
+      // Push 2D plot to bottom-left
+      layout.margin = { l: 20, r: 300, b: 20, t: 100 };
 
       // Highlight vector
       if (prevBelief && hoveredBelief) {
@@ -344,16 +346,18 @@ function App() {
       <div style={{ display: 'flex', gap: '20px', alignItems: 'stretch', marginBottom: '30px' }}>
         
         {/* Left Column: Plot */}
-        <div style={{ flex: 1, minWidth: '500px' }}>
+        <div style={{ flex: 1, minWidth: '800px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ 
                 background: 'white', 
                 padding: '10px', 
                 borderRadius: '12px', 
                 boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                marginBottom: '20px'
+                position: 'relative'
             }}>
                 <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0 }}>Belief Space</h3>
+                    <h3 style={{ margin: 0 }}>
+                        {beliefMode === 'constrained' ? 'Constrained Belief Space' : 'Standard Belief Space'}
+                    </h3>
                     <div style={{ display: 'flex', gap: '15px' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
                             <input 
@@ -378,12 +382,12 @@ function App() {
                     <Plot
                         data={plotData.data}
                         layout={plotData.layout}
-                        style={{ width: '100%', height: '500px' }}
+                        style={{ width: '100%', height: '600px' }}
                         config={{ displayModeBar: false }}
                     />
                 ) : (
                     <div style={{ 
-                        height: '500px', 
+                        height: '600px', 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center', 
@@ -394,12 +398,71 @@ function App() {
                         Generate data to see visualization
                     </div>
                 )}
+
+                {/* Belief Visualizer (Inset top right) */}
+                <div style={{
+                    position: 'absolute',
+                    top: '90px',
+                    right: '20px',
+                    width: '380px',
+                    height: '330px',
+                    zIndex: 10
+                }}>
+                    <BeliefVisualizer 
+                        probabilities={hoveredBelief || initialState || [0.33, 0.33, 0.33]} 
+                        minimal={true}
+                        showButton={true}
+                    />
+                </div>
             </div>
 
-            {/* Belief Visualizer (Single State) */}
-            <div>
-                <BeliefVisualizer probabilities={hoveredBelief || initialState || [0.33, 0.33, 0.33]} />
-            </div>
+            {/* Generated Words (Moved here) */}
+            {words.length > 0 && (
+                <div style={STYLES.wordListContainer}>
+                    <h3 style={{ marginTop: 0, fontSize: '18px', color: '#333', marginBottom: '10px' }}>Generated Words</h3>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px', fontStyle: 'italic' }}>
+                        Hover over characters to see belief state
+                    </div>
+                    <ul style={{ paddingLeft: '0', margin: 0, listStyle: 'none' }}>
+                        {words.map((fullWord, idx) => (
+                            <li key={idx} style={STYLES.wordItem}>
+                                {fullWord.split('').map((char, charIdx) => (
+                                    <span 
+                                        key={charIdx}
+                                        onMouseEnter={() => {
+                                            const activeBeliefs = beliefMode === 'constrained' ? constrainedBeliefs : beliefStates;
+                                            
+                                            if (activeBeliefs[idx] && activeBeliefs[idx][charIdx]) {
+                                                setHoveredBelief(activeBeliefs[idx][charIdx]);
+                                                
+                                                // Determine previous belief
+                                                if (charIdx === 0) {
+                                                    setPrevBelief(initialState);
+                                                } else {
+                                                    setPrevBelief(activeBeliefs[idx][charIdx - 1]);
+                                                }
+                                            }
+                                            // Update selected symbol in Matrix Editor
+                                            const symbolIdx = parseInt(char);
+                                            if (!isNaN(symbolIdx) && symbolIdx >= 0 && symbolIdx < matrices.length) {
+                                        setSelectedSymbol(symbolIdx);
+                                    }
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredBelief(null);
+                                    setPrevBelief(null);
+                                }}
+                                style={STYLES.charSpan}
+                                className="word-char"
+                            >
+                                {char}
+                            </span>
+                        ))}
+                    </li>
+                ))}
+            </ul>
+        </div>
+      )}
         </div>
 
         {/* Right Column: Matrix Editor */}
@@ -475,51 +538,6 @@ function App() {
 
       {error && <div style={{ color: 'red', marginBottom: '20px' }}>{error}</div>}
 
-      {/* Output Row */}
-      {words.length > 0 && (
-        <div style={STYLES.wordListContainer}>
-            <h3 style={{ marginTop: 0, fontSize: '18px', color: '#333', marginBottom: '10px' }}>Generated Words</h3>
-            <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px', fontStyle: 'italic' }}>
-                Hover over characters to see belief state
-            </div>
-            <ul style={{ paddingLeft: '0', margin: 0, listStyle: 'none' }}>
-                {words.map((fullWord, idx) => (
-                    <li key={idx} style={STYLES.wordItem}>
-                        {fullWord.split('').map((char, charIdx) => (
-                            <span 
-                                key={charIdx}
-                                onMouseEnter={() => {
-                                    if (beliefStates[idx] && beliefStates[idx][charIdx]) {
-                                        setHoveredBelief(beliefStates[idx][charIdx]);
-                                        
-                                        // Determine previous belief
-                                        if (charIdx === 0) {
-                                            setPrevBelief(initialState);
-                                        } else {
-                                            setPrevBelief(beliefStates[idx][charIdx - 1]);
-                                        }
-                                    }
-                                    // Update selected symbol in Matrix Editor
-                                    const symbolIdx = parseInt(char);
-                                    if (!isNaN(symbolIdx) && symbolIdx >= 0 && symbolIdx < matrices.length) {
-                                        setSelectedSymbol(symbolIdx);
-                                    }
-                                }}
-                                onMouseLeave={() => {
-                                    setHoveredBelief(null);
-                                    setPrevBelief(null);
-                                }}
-                                style={STYLES.charSpan}
-                                className="word-char"
-                            >
-                                {char}
-                            </span>
-                        ))}
-                    </li>
-                ))}
-            </ul>
-        </div>
-      )}
     </div>
   );
 }
