@@ -83,13 +83,16 @@ function App() {
   const [selectedSymbol, setSelectedSymbol] = useState(0);
   const [words, setWords] = useState([]);
   const [beliefStates, setBeliefStates] = useState([]);
+  const [constrainedBeliefs, setConstrainedBeliefs] = useState([]);
   const [flatBeliefs, setFlatBeliefs] = useState([]);
+  const [flatConstrainedBeliefs, setFlatConstrainedBeliefs] = useState([]);
   const [initialState, setInitialState] = useState(null);
   const [hoveredBelief, setHoveredBelief] = useState(null);
   const [prevBelief, setPrevBelief] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('2d'); // '2d' or '3d'
+  const [beliefMode, setBeliefMode] = useState('standard'); // 'standard' or 'constrained'
 
   // Fetch preset matrices when preset or params change
   useEffect(() => {
@@ -174,8 +177,10 @@ function App() {
       
       setWords(response.data.words);
       setBeliefStates(response.data.belief_states);
+      setConstrainedBeliefs(response.data.constrained_beliefs);
       setInitialState(response.data.initial_state);
       setFlatBeliefs(response.data.flat_beliefs);
+      setFlatConstrainedBeliefs(response.data.flat_constrained_beliefs);
       
     } catch (err) {
       console.error(err);
@@ -192,9 +197,10 @@ function App() {
   };
 
   const getPlotData = () => {
-    if (!flatBeliefs || flatBeliefs.length === 0) return null;
+    const activeFlatBeliefs = beliefMode === 'constrained' ? flatConstrainedBeliefs : flatBeliefs;
+    if (!activeFlatBeliefs || activeFlatBeliefs.length === 0) return null;
 
-    const colors = flatBeliefs.map(b => getRGBString(b));
+    const colors = activeFlatBeliefs.map(b => getRGBString(b));
     const data = [];
     
     // Use a constant uirevision to preserve camera state across updates
@@ -211,9 +217,9 @@ function App() {
       data.push({
         type: 'scatter3d',
         mode: 'markers',
-        x: flatBeliefs.map(b => b[0]),
-        y: flatBeliefs.map(b => b[1]),
-        z: flatBeliefs.map(b => b[2]),
+        x: activeFlatBeliefs.map(b => b[0]),
+        y: activeFlatBeliefs.map(b => b[1]),
+        z: activeFlatBeliefs.map(b => b[2]),
         marker: {
           size: 3,
           color: colors,
@@ -269,8 +275,8 @@ function App() {
 
       return { data, layout };
     } else {
-      // 2D Simplex
-      const points = flatBeliefs.map(simplexToPolygon);
+      // 2D Simplex (Triangle)
+      const points = activeFlatBeliefs.map(b => simplexToPolygon(b));
       
       // Triangle boundary
       const v = [[0, 0], [1, 0], [0.5, Math.sqrt(3)/2], [0,0]];
@@ -348,14 +354,24 @@ function App() {
             }}>
                 <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0 }}>Belief Space</h3>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                        <input 
-                            type="checkbox" 
-                            checked={viewMode === '2d'} 
-                            onChange={(e) => setViewMode(e.target.checked ? '2d' : '3d')} 
-                        />
-                        Show 2D Simplex
-                    </label>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                            <input 
+                                type="checkbox" 
+                                checked={beliefMode === 'constrained'} 
+                                onChange={(e) => setBeliefMode(e.target.checked ? 'constrained' : 'standard')} 
+                            />
+                            Constrained Mode
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                            <input 
+                                type="checkbox" 
+                                checked={viewMode === '2d'} 
+                                onChange={(e) => setViewMode(e.target.checked ? '2d' : '3d')} 
+                            />
+                            Show 2D Simplex
+                        </label>
+                    </div>
                 </div>
                 
                 {plotData ? (
@@ -397,6 +413,7 @@ function App() {
                 onSymbolChange={setSelectedSymbol}
                 prevBelief={prevBelief}
                 nextBelief={hoveredBelief}
+                beliefMode={beliefMode}
             />
         </div>
       </div>

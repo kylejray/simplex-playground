@@ -54,7 +54,7 @@ async def generate_data(request: GenerateRequest):
         matrix_params = np.array(request.matrices)
         generator = HiddenMarkovModel(matrix_params)
         
-        words, belief_states, initial_state = generator.generate(request.batch_size, request.sequence_len)
+        words, belief_states, constrained_beliefs, initial_state = generator.generate(request.batch_size, request.sequence_len)
         
         # Generate plot data
         # We need to flatten the belief states for plotting
@@ -64,13 +64,19 @@ async def generate_data(request: GenerateRequest):
         all_beliefs = []
         for seq in belief_states:
             all_beliefs.extend(seq)
+
+        all_constrained_beliefs = []
+        for seq in constrained_beliefs:
+            all_constrained_beliefs.extend(seq)
             
         # Return raw data for frontend visualization
         return {
             "words": words,
             "belief_states": belief_states,
+            "constrained_beliefs": constrained_beliefs,
             "initial_state": initial_state,
-            "flat_beliefs": all_beliefs
+            "flat_beliefs": all_beliefs,
+            "flat_constrained_beliefs": all_constrained_beliefs
         }
     except Exception as e:
         import traceback

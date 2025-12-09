@@ -67,7 +67,7 @@ const NormalizedInput = ({ rawValue, totalSum, onChange, style, className }) => 
     );
 };
 
-const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymbol, onSymbolChange, prevBelief, nextBelief }) => {
+const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymbol, onSymbolChange, prevBelief, nextBelief, beliefMode }) => {
   
   const handleCellChange = (row, col, value) => {
     const newMatrices = JSON.parse(JSON.stringify(matrices));
@@ -396,7 +396,9 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 textAlign: 'right'
             }}>
                 <div style={{ fontWeight: 'normal', fontSize: '0.85em', lineHeight: '1.4' }}>
-                    arrow weight depicts the importance of each channel in the belief state update
+                    {beliefMode === 'constrained' 
+                        ? "Constrained Mode: Arrows show additive update contributions"
+                        : "Standard Mode: Arrows show multiplicative belief updates"}
                 </div>
             </div>
         )}

@@ -138,4 +138,80 @@ class HiddenMarkovModel:
                 seq_beliefs.append(belief_history_steps[t][i].tolist())
             belief_states_list.append(seq_beliefs)
             
-        return words, belief_states_list, self.initial_state.tolist()
+        # Calculate constrained belief states (Equation 5 from paper)
+        constrained_beliefs_list = self._generate_constrained_beliefs(all_observations[:num_display])
+            
+        return words, belief_states_list, constrained_beliefs_list, self.initial_state.tolist()
+
+    def _generate_constrained_beliefs(self, observations):
+        """
+        Generate constrained belief states using the additive update rule.
+        r_d = pi + sum_{s=1}^d ( pi @ T_{|z_s} @ T^{d-s} - pi )
+        """
+        batch_size, seq_len = observations.shape
+        constrained_beliefs = []
+        
+        # Precompute local posteriors: pi @ T_{|z} (normalized)
+        # T_{|z} here refers to the transition matrix conditioned on observing z
+        # In our notation, self.transition_matrices[z] is P(S', O=z | S)
+        # So pi @ T[z] gives the joint distribution P(S', O=z)
+        # We normalize this to get P(S' | O=z) which represents the belief after 1 step observing z
+        
+        local_posteriors = np.zeros((self.num_symbols, self.num_states))
+        for k in range(self.num_symbols):
+            joint = self.initial_state @ self.transition_matrices[k]
+            norm = np.sum(joint)
+            if norm > 0:
+                local_posteriors[k] = joint / norm
+            else:
+                local_posteriors[k] = self.initial_state
+
+        # Precompute powers of the state transition matrix T^k
+        # T_powers[k] = T^k
+        T_powers = [np.eye(self.num_states)] # T^0
+        curr_T = np.eye(self.num_states)
+        for _ in range(seq_len):
+            curr_T = curr_T @ self.state_transition_matrix
+            T_powers.append(curr_T)
+            
+        # Compute beliefs for each sequence
+        for b in range(batch_size):
+            seq_beliefs = []
+            seq_obs = observations[b]
+            
+            for d in range(seq_len):
+                # d is 0-indexed, so it corresponds to position d+1 in 1-based indexing
+                # The sum is from s=1 to d+1
+                
+                # Start with pi
+                r_d = self.initial_state.copy()
+                
+                # Add contributions from history
+                for s in range(d + 1):
+                    # s is 0-indexed index of observation
+                    z_s = seq_obs[s]
+                    
+                    # Distance from s to d is (d - s) steps
+                    # We apply T^(d-s)
+                    
+                    # Contribution: (Posterior_s @ T^(d-s)) - pi
+                    posterior = local_posteriors[z_s]
+                    propagated = posterior @ T_powers[d - s]
+                    
+                    contribution = propagated - self.initial_state
+                    r_d += contribution
+                
+                # Normalize to simplex
+                # The additive approximation doesn't guarantee valid probability distribution
+                # So we clip and normalize
+                r_d = np.maximum(r_d, 0)
+                norm = np.sum(r_d)
+                if norm > 0:
+                    r_d /= norm
+                else:
+                    r_d = self.initial_state.copy()
+                    
+                seq_beliefs.append(r_d.tolist())
+            constrained_beliefs.append(seq_beliefs)
+            
+        return constrained_beliefs
