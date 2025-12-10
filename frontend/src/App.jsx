@@ -72,9 +72,18 @@ function App() {
     batch_size: 128,
     sequence_len: 25,
     preset: 'mess3',
+    // Current active values (initialized to mess3 defaults)
     x: 0.15,
     y: 0.7,
-    a: 0.6
+    a: 0.6,
+    b: 0.0,
+    // Independent parameter storage for each preset
+    presets: {
+        mess3: { x: 0.15, a: 0.6 },
+        left_right_mix: { a: 0.1, b: 0.17 },
+        simple_constrained: { x: 0.1, y: 0.7 },
+        custom: {}
+    }
   });
   
   // Default 3 symbols, 3 states (Identity matrices)
@@ -109,7 +118,7 @@ function App() {
         } else if (config.preset === 'mess3') {
           payload.kwargs = { x: parseFloat(config.x), a: parseFloat(config.a) };
         } else if (config.preset === 'left_right_mix') {
-          payload.kwargs = {};
+          payload.kwargs = { a: parseFloat(config.a), b: parseFloat(config.b) };
         }
         
         const response = await axios.post(`${API_URL}/get_preset`, payload);
@@ -121,14 +130,59 @@ function App() {
     };
 
     fetchPreset();
-  }, [config.preset, config.x, config.y, config.a]);
+  }, [config.preset, config.x, config.y, config.a, config.b]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setConfig(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    setConfig(prev => {
+        if (name === 'preset') {
+            // Switching preset: Save current params to old preset, load new params
+            const oldPreset = prev.preset;
+            const newPreset = value;
+            
+            // Update storage for the old preset with current values
+            const updatedPresets = { ...prev.presets };
+            if (oldPreset !== 'custom') {
+                 // We save all params, though only some are relevant. 
+                 // This is simpler than filtering based on preset type.
+                 updatedPresets[oldPreset] = { 
+                     ...updatedPresets[oldPreset],
+                     x: prev.x, y: prev.y, a: prev.a, b: prev.b 
+                 };
+            }
+            
+            // Load values for the new preset
+            const newParams = updatedPresets[newPreset] || {};
+            
+            return {
+                ...prev,
+                preset: newPreset,
+                presets: updatedPresets,
+                ...newParams // Overwrite current x, y, a, b with stored values
+            };
+        } else {
+            // Changing a parameter value
+            const newState = {
+                ...prev,
+                [name]: value
+            };
+            
+            // Update the storage for the current preset immediately
+            // This ensures state is consistent even if we don't switch presets
+            if (['x', 'y', 'a', 'b'].includes(name) && prev.preset !== 'custom') {
+                newState.presets = {
+                    ...prev.presets,
+                    [prev.preset]: {
+                        ...prev.presets[prev.preset],
+                        [name]: value
+                    }
+                };
+            }
+            
+            return newState;
+        }
+    });
   };
 
   // Auto-generate when config changes (debounced)

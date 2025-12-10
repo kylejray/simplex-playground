@@ -356,6 +356,39 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             </div>
           </>
         )}
+
+        {config.preset === 'left_right_mix' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>A:</label>
+              <input 
+                type="range" 
+                min="-0.46" 
+                max="0.4" 
+                step="0.01" 
+                name="a" 
+                value={config.a} 
+                onChange={handleConfigChange} 
+                style={{ width: '120px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.a}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>B:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max={Math.max(0, 0.44 - (parseFloat(config.a) || 0))} 
+                step="0.01" 
+                name="b" 
+                value={config.b} 
+                onChange={handleConfigChange} 
+                style={{ width: '120px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.b}</span>
+            </div>
+          </>
+        )}
         
         <div style={{ flex: 1 }}></div>
         
