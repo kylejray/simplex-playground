@@ -3,7 +3,7 @@ name = "example"
 version = "0.1.0"
 description = "This is an example repo for a Simplex research project"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn",
@@ -16,7 +16,7 @@ dev = ["nbqa", "pyright", "pytest", "pytest-cov", "ruff"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py311"
 
 [tool.ruff.lint]
 ignore = [
