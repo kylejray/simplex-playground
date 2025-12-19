@@ -320,6 +320,9 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
           >
             <option value="mess3">Mess 3</option>
             <option value="left_right_mix">Left/Right Mix</option>
+            <option value="cyclic_rank1">Cyclic Rank-1</option>
+            <option value="rank1">Rank-1 (Fuzzy)</option>
+            <option value="abc_ratio">ABC Ratio</option>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -386,6 +389,182 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 style={{ width: '120px' }}
               />
               <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.b}</span>
+            </div>
+          </>
+        )}
+
+        {config.preset === 'cyclic_rank1' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Symbols:</label>
+              <input 
+                type="number" 
+                min="2" 
+                max="10" 
+                step="1" 
+                name="n_symbols" 
+                value={config.n_symbols} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Decay:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="state_decay" 
+                value={config.state_decay} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.state_decay}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Contrast:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="contrast" 
+                value={config.contrast} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.contrast}</span>
+            </div>
+          </>
+        )}
+
+        {config.preset === 'rank1' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Symbols:</label>
+              <input 
+                type="number" 
+                min="2" 
+                max="10" 
+                step="1" 
+                name="n_symbols" 
+                value={config.n_symbols} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Decay:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="state_decay" 
+                value={config.state_decay} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.state_decay}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Fuzziness:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="10" 
+                step="0.1" 
+                name="fuzziness" 
+                value={config.fuzziness} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.fuzziness}</span>
+            </div>
+          </>
+        )}
+
+        {config.preset === 'abc_ratio' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>A:</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="50" 
+                step="1" 
+                name="ratio_a" 
+                value={config.ratio_a} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>B:</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="50" 
+                step="1" 
+                name="ratio_b" 
+                value={config.ratio_b} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>C:</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="50" 
+                step="1" 
+                name="ratio_c" 
+                value={config.ratio_c} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ borderLeft: '2px solid #ccc', height: '24px', margin: '0 10px' }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>D:</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="50" 
+                step="1" 
+                name="ratio_d" 
+                value={config.ratio_d} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>E:</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="50" 
+                step="1" 
+                name="ratio_e" 
+                value={config.ratio_e} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>F:</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="50" 
+                step="1" 
+                name="ratio_f" 
+                value={config.ratio_f} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
             </div>
           </>
         )}
@@ -534,6 +713,51 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Sum Matrix (Full Transition Matrix) */}
+          <div style={{ 
+            marginTop: '30px', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            padding: '20px',
+            borderRadius: '12px',
+            background: '#e8f4e8',
+            border: '2px solid #4caf50'
+          }}>
+            <div style={{ marginBottom: '15px', fontWeight: 'bold', color: '#2e7d32', fontSize: '1.3em' }}>
+              Full Transition Matrix (Σ Symbols)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: `repeat(${numStates}, 1fr)`, 
+                gap: '15px',
+                padding: '20px 25px',
+                position: 'relative',
+                margin: '0 5px'
+              }}>
+                {/* Brackets */}
+                <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '15px', border: '3px solid #2e7d32', borderRight: 'none', borderRadius: '10px 0 0 10px' }}></div>
+                <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: '15px', border: '3px solid #2e7d32', borderLeft: 'none', borderRadius: '0 10px 10px 0' }}></div>
+
+                {(() => {
+                  // Calculate sum matrix
+                  const sumMatrix = allNormalizedMatrices.reduce((acc, matrix) => {
+                    return acc.map((row, r) => row.map((val, c) => val + matrix[r][c]));
+                  }, allNormalizedMatrices[0].map(row => row.map(() => 0)));
+                  
+                  return sumMatrix.map((row, r) => 
+                    row.map((val, c) => (
+                      <div key={`sum-${r}-${c}`} style={{ width: '60px', textAlign: 'center', fontSize: '20px', fontFamily: 'monospace', fontWeight: 'bold', color: '#2e7d32' }}>
+                        {typeof val === 'number' ? val.toFixed(2) : val}
+                      </div>
+                    ))
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         </div>
 

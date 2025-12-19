@@ -36,6 +36,12 @@ def get_matrices_array(key, kwargs):
         return mess3(**kwargs)
     if key == 'left_right_mix':
         return matrices.left_right_mix(**kwargs)
+    if key == 'cyclic_rank1':
+        return matrices.cyclic_rank1(**kwargs)
+    if key == 'rank1':
+        return matrices.rank1(**kwargs)
+    if key == 'abc_ratio':
+        return matrices.abc_ratio(**kwargs)
     raise ValueError(f"Unknown matrix key: {key}")
 
 @app.post("/get_preset")

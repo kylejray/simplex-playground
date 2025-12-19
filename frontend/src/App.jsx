@@ -77,11 +77,27 @@ function App() {
     y: 0.7,
     a: 0.6,
     b: 0.0,
+    // Cyclic rank1 params
+    n_states: 3,
+    n_symbols: 3,
+    state_decay: 0.15,
+    contrast: 1.0,
+    fuzziness: 1.3,
+    // ABC ratio params
+    ratio_a: 20,
+    ratio_b: 6,
+    ratio_c: 6,
+    ratio_d: 6,
+    ratio_e: 1,
+    ratio_f: 1,
     // Independent parameter storage for each preset
     presets: {
         mess3: { x: 0.15, a: 0.6 },
         left_right_mix: { a: 0.1, b: 0.17 },
         simple_constrained: { x: 0.1, y: 0.7 },
+        cyclic_rank1: { n_states: 3, n_symbols: 3, state_decay: 0.15, contrast: 1.0 },
+        rank1: { n_states: 3, n_symbols: 3, state_decay: 0.9, fuzziness: 1.3 },
+        abc_ratio: { ratio_a: 20, ratio_b: 6, ratio_c: 6, ratio_d: 6, ratio_e: 1, ratio_f: 1 },
         custom: {}
     }
   });
@@ -119,6 +135,29 @@ function App() {
           payload.kwargs = { x: parseFloat(config.x), a: parseFloat(config.a) };
         } else if (config.preset === 'left_right_mix') {
           payload.kwargs = { a: parseFloat(config.a), b: parseFloat(config.b) };
+        } else if (config.preset === 'cyclic_rank1') {
+          payload.kwargs = { 
+            n_states: 3, 
+            n_symbols: parseInt(config.n_symbols), 
+            state_decay: parseFloat(config.state_decay),
+            contrast: parseFloat(config.contrast)
+          };
+        } else if (config.preset === 'rank1') {
+          payload.kwargs = { 
+            n_states: 3, 
+            n_symbols: parseInt(config.n_symbols), 
+            state_decay: parseFloat(config.state_decay),
+            fuzziness: parseFloat(config.fuzziness)
+          };
+        } else if (config.preset === 'abc_ratio') {
+          payload.kwargs = { 
+            a: parseInt(config.ratio_a), 
+            b: parseInt(config.ratio_b), 
+            c: parseInt(config.ratio_c),
+            d: parseInt(config.ratio_d), 
+            e: parseInt(config.ratio_e), 
+            f: parseInt(config.ratio_f)
+          };
         }
         
         const response = await axios.post(`${API_URL}/get_preset`, payload);
@@ -130,7 +169,7 @@ function App() {
     };
 
     fetchPreset();
-  }, [config.preset, config.x, config.y, config.a, config.b]);
+  }, [config.preset, config.x, config.y, config.a, config.b, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -148,7 +187,11 @@ function App() {
                  // This is simpler than filtering based on preset type.
                  updatedPresets[oldPreset] = { 
                      ...updatedPresets[oldPreset],
-                     x: prev.x, y: prev.y, a: prev.a, b: prev.b 
+                     x: prev.x, y: prev.y, a: prev.a, b: prev.b,
+                     n_states: prev.n_states, n_symbols: prev.n_symbols,
+                     state_decay: prev.state_decay, contrast: prev.contrast, fuzziness: prev.fuzziness,
+                     ratio_a: prev.ratio_a, ratio_b: prev.ratio_b, ratio_c: prev.ratio_c,
+                     ratio_d: prev.ratio_d, ratio_e: prev.ratio_e, ratio_f: prev.ratio_f
                  };
             }
             
@@ -170,7 +213,7 @@ function App() {
             
             // Update the storage for the current preset immediately
             // This ensures state is consistent even if we don't switch presets
-            if (['x', 'y', 'a', 'b'].includes(name) && prev.preset !== 'custom') {
+            if (['x', 'y', 'a', 'b', 'n_states', 'n_symbols', 'state_decay', 'contrast', 'fuzziness', 'ratio_a', 'ratio_b', 'ratio_c', 'ratio_d', 'ratio_e', 'ratio_f'].includes(name) && prev.preset !== 'custom') {
                 newState.presets = {
                     ...prev.presets,
                     [prev.preset]: {
