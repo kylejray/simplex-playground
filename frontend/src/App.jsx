@@ -98,6 +98,7 @@ function App() {
         cyclic_rank1: { n_states: 3, n_symbols: 3, state_decay: 0.15, contrast: 1.0 },
         rank1: { n_states: 3, n_symbols: 3, state_decay: 0.9, fuzziness: 1.3 },
         abc_ratio: { ratio_a: 20, ratio_b: 6, ratio_c: 6, ratio_d: 6, ratio_e: 1, ratio_f: 1 },
+        rank1_predefined: { p_scale: 1.0, n_scale: 1.0, a: 0.5, ratio_a: 1, ratio_b: 1, ratio_c: 1 },
         custom: {}
     }
   });
@@ -151,12 +152,21 @@ function App() {
           };
         } else if (config.preset === 'abc_ratio') {
           payload.kwargs = { 
-            a: parseInt(config.ratio_a), 
-            b: parseInt(config.ratio_b), 
-            c: parseInt(config.ratio_c),
-            d: parseInt(config.ratio_d), 
-            e: parseInt(config.ratio_e), 
-            f: parseInt(config.ratio_f)
+            ratio_a: parseInt(config.ratio_a), 
+            ratio_b: parseInt(config.ratio_b), 
+            ratio_c: parseInt(config.ratio_c),
+            ratio_d: parseInt(config.ratio_d), 
+            ratio_e: parseInt(config.ratio_e), 
+            ratio_f: parseInt(config.ratio_f)
+          };
+        } else if (config.preset === 'rank1_predefined') {
+          payload.kwargs = {
+            p_scale: parseFloat(config.p_scale || 1.0),
+            n_scale: parseFloat(config.n_scale || 1.0),
+            a: parseFloat(config.a),
+            ratio_a: parseFloat(config.ratio_a),
+            ratio_b: parseFloat(config.ratio_b),
+            ratio_c: parseFloat(config.ratio_c)
           };
         }
         

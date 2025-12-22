@@ -42,6 +42,8 @@ def get_matrices_array(key, kwargs):
         return matrices.rank1(**kwargs)
     if key == 'abc_ratio':
         return matrices.abc_ratio(**kwargs)
+    if key == 'rank1_predefined':
+        return matrices.rank1_predefined(**kwargs)
     raise ValueError(f"Unknown matrix key: {key}")
 
 @app.post("/get_preset")

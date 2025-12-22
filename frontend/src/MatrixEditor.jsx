@@ -323,6 +323,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             <option value="cyclic_rank1">Cyclic Rank-1</option>
             <option value="rank1">Rank-1 (Fuzzy)</option>
             <option value="abc_ratio">ABC Ratio</option>
+            <option value="rank1_predefined">Rank-1 (Predefined)</option>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -565,6 +566,62 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 onChange={handleConfigChange} 
                 style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
               />
+            </div>
+          </>
+        )}
+
+        {config.preset === 'rank1_predefined' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>P Scale:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="p_scale" 
+                value={config.p_scale || 1.0} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>N Scale:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="n_scale" 
+                value={config.n_scale || 1.0} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Split (a):</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="a" 
+                value={config.a} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>A:</label>
+              <input type="number" min="1" max="50" name="ratio_a" value={config.ratio_a} onChange={handleConfigChange} style={{ width: '40px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>B:</label>
+              <input type="number" min="1" max="50" name="ratio_b" value={config.ratio_b} onChange={handleConfigChange} style={{ width: '40px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>C:</label>
+              <input type="number" min="1" max="50" name="ratio_c" value={config.ratio_c} onChange={handleConfigChange} style={{ width: '40px' }} />
             </div>
           </>
         )}
