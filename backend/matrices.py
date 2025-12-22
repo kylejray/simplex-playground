@@ -260,3 +260,58 @@ def abc_ratio(a: int = 4, b: int = 2, c: int = 1, d: int = 4, e: int = 2, f: int
                 matrices[k][row, col] = pieces[piece_index]
                 
     return np.array(matrices)
+def rank1_predefined(p_scale: float, n_scale: float, a: float, 
+                     ratio_a: float, ratio_b: float, ratio_c: float) -> np.ndarray:
+    """
+    Generates 3 symbol matrices that sum to a specific Rank-1 transition matrix.
+    Uses a P/N set distribution with permutations to ensure variety.
+    
+    Args:
+        p_scale: Scale factor for P (0 to 1)
+        n_scale: Scale factor for N (0 to 1)
+        a: Splitting factor (0 to 1)
+        ratio_a, ratio_b, ratio_c: Ratios for the target rank-1 vector
+    """
+    # 1. Define Target Rank-1 Matrix T
+    ratios = np.array([ratio_a, ratio_b, ratio_c], dtype=float)
+    v = ratios / ratios.sum()
+    T = np.tile(v, (3, 1))
+    
+    # 2. Calculate Max P and Max |N| constraints
+    # P_max = min(v) / (3 * max(a, 1-a))
+    max_split = max(a, 1-a)
+    if max_split == 0: max_split = 1e-9
+    p_max = (1/3) * np.min(v) / max_split
+    
+    # |N|_max = min(v) / 3
+    n_max = (1/3) * np.min(v)
+    
+    # 3. Set actual P and N
+    P = p_scale * p_max
+    N = -1 * n_scale * n_max
+    
+    # 4. Create P-set and N-set (sum to 0)
+    p_set = np.array([P, -(1-a)*P, -a*P])
+    n_set = np.array([N, -(1-a)*N, -a*N])
+    
+    # 5. Distribute into Raw matrices with permutation
+    raw_matrices = np.zeros((3, 3, 3)) # (symbol, state_from, state_to)
+    
+    for i in range(3):
+        for j in range(3):
+            vals = p_set if i == j else n_set
+            
+            # Shift values cyclically based on position (i+j)
+            shift = (i + j) % 3
+            vals_permuted = np.roll(vals, shift)
+            
+            raw_matrices[0, i, j] = vals_permuted[0]
+            raw_matrices[1, i, j] = vals_permuted[1]
+            raw_matrices[2, i, j] = vals_permuted[2]
+
+    # 6. Add 1/3 of T to each symbol matrix
+    final_matrices = np.zeros_like(raw_matrices)
+    for k in range(3):
+        final_matrices[k] = raw_matrices[k] + (1/3) * T
+        
+    return final_matrices
