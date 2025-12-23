@@ -26,6 +26,8 @@ class GenerateRequest(BaseModel):
     batch_size: int = 128
     sequence_len: int = 25
     matrices: list
+    generation_mode: str = 'random' # 'random' or 'systematic'
+    max_words: int = 1000
 
 class PresetRequest(BaseModel):
     key: str
@@ -44,6 +46,8 @@ def get_matrices_array(key, kwargs):
         return matrices.abc_ratio(**kwargs)
     if key == 'rank1_predefined':
         return matrices.rank1_predefined(**kwargs)
+    if key == 'rank1-xmas':
+        return matrices.rank1_xmas(**kwargs)
     raise ValueError(f"Unknown matrix key: {key}")
 
 @app.post("/get_preset")
@@ -62,7 +66,14 @@ async def generate_data(request: GenerateRequest):
         matrix_params = np.array(request.matrices)
         generator = HiddenMarkovModel(matrix_params)
         
-        words, belief_states, constrained_beliefs, initial_state = generator.generate(request.batch_size, request.sequence_len)
+        if request.generation_mode == 'systematic':
+            # Use sequence_len as max_len
+            words, belief_states, constrained_beliefs, initial_state = generator.generate_systematic(
+                max_len=request.sequence_len, 
+                max_count=request.max_words
+            )
+        else:
+            words, belief_states, constrained_beliefs, initial_state = generator.generate(request.batch_size, request.sequence_len)
         
         # Generate plot data
         # We need to flatten the belief states for plotting

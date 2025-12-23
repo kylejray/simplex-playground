@@ -98,9 +98,13 @@ function App() {
         cyclic_rank1: { n_states: 3, n_symbols: 3, state_decay: 0.15, contrast: 1.0 },
         rank1: { n_states: 3, n_symbols: 3, state_decay: 0.9, fuzziness: 1.3 },
         abc_ratio: { ratio_a: 20, ratio_b: 6, ratio_c: 6, ratio_d: 6, ratio_e: 1, ratio_f: 1 },
-        rank1_predefined: { p_scale: 1.0, n_scale: 1.0, a: 0.5, ratio_a: 1, ratio_b: 1, ratio_c: 1 },
+        rank1_predefined: { p_scale: 0.5, a: 0.5, ratio_a: 1, ratio_b: 1, ratio_c: 1 },
+        'rank1-xmas': { scale_a: 0.9, scale_b: 0.9, s1: 0.5, s2: 0.5, s3: 0.5, ratio_a: 11, ratio_b: 7, ratio_c: 7 },
         custom: {}
-    }
+    },
+    generation_mode: 'random', // 'random' or 'systematic'
+    max_words: 1000,
+    max_len: 10
   });
   
   // Default 3 symbols, 3 states (Identity matrices)
@@ -168,6 +172,19 @@ function App() {
             ratio_b: parseFloat(config.ratio_b),
             ratio_c: parseFloat(config.ratio_c)
           };
+        } else if (config.preset === 'rank1-xmas') {
+          payload.kwargs = {
+            scale_a: parseFloat(config.scale_a || 0.9),
+            scale_b: parseFloat(config.scale_b || 0.9),
+            s1: parseFloat(config.s1 || 0.5),
+            s2: parseFloat(config.s2 || 0.5),
+            s3: parseFloat(config.s3 || 0.5),
+            ratios: [
+                parseFloat(config.ratio_a || 1),
+                parseFloat(config.ratio_b || 1),
+                parseFloat(config.ratio_c || 1)
+            ]
+          };
         }
         
         const response = await axios.post(`${API_URL}/get_preset`, payload);
@@ -179,7 +196,7 @@ function App() {
     };
 
     fetchPreset();
-  }, [config.preset, config.x, config.y, config.a, config.b, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f]);
+  }, [config.preset, config.x, config.y, config.a, config.b, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f, config.p_scale, config.n_scale, config.scale_a, config.scale_b, config.s1, config.s2, config.s3, config.generation_mode, config.max_words, config.max_len]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -201,7 +218,10 @@ function App() {
                      n_states: prev.n_states, n_symbols: prev.n_symbols,
                      state_decay: prev.state_decay, contrast: prev.contrast, fuzziness: prev.fuzziness,
                      ratio_a: prev.ratio_a, ratio_b: prev.ratio_b, ratio_c: prev.ratio_c,
-                     ratio_d: prev.ratio_d, ratio_e: prev.ratio_e, ratio_f: prev.ratio_f
+                     ratio_d: prev.ratio_d, ratio_e: prev.ratio_e, ratio_f: prev.ratio_f,
+                     p_scale: prev.p_scale, n_scale: prev.n_scale,
+                     scale_a: prev.scale_a, scale_b: prev.scale_b,
+                     s1: prev.s1, s2: prev.s2, s3: prev.s3
                  };
             }
             
@@ -223,7 +243,7 @@ function App() {
             
             // Update the storage for the current preset immediately
             // This ensures state is consistent even if we don't switch presets
-            if (['x', 'y', 'a', 'b', 'n_states', 'n_symbols', 'state_decay', 'contrast', 'fuzziness', 'ratio_a', 'ratio_b', 'ratio_c', 'ratio_d', 'ratio_e', 'ratio_f'].includes(name) && prev.preset !== 'custom') {
+            if (['x', 'y', 'a', 'b', 'n_states', 'n_symbols', 'state_decay', 'contrast', 'fuzziness', 'ratio_a', 'ratio_b', 'ratio_c', 'ratio_d', 'ratio_e', 'ratio_f', 'p_scale', 'n_scale', 'scale_a', 'scale_b', 's1', 's2', 's3', 'generation_mode', 'max_words', 'max_len'].includes(name) && prev.preset !== 'custom') {
                 newState.presets = {
                     ...prev.presets,
                     [prev.preset]: {
@@ -276,8 +296,10 @@ function App() {
 
       const payload = {
         batch_size: parseInt(config.batch_size),
-        sequence_len: parseInt(config.sequence_len),
-        matrices: normalizedMatrices
+        sequence_len: config.generation_mode === 'systematic' ? parseInt(config.max_len) : parseInt(config.sequence_len),
+        matrices: normalizedMatrices,
+        generation_mode: config.generation_mode,
+        max_words: parseInt(config.max_words)
       };
 
       const response = await axios.post(`${API_URL}/generate`, payload);
@@ -600,26 +622,66 @@ function App() {
             boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
             flexWrap: 'wrap'
         }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label style={{ fontWeight: 'bold', color: '#555' }}>Batch Size: </label>
-            <input 
-                type="number" 
-                name="batch_size" 
-                value={config.batch_size} 
-                onChange={handleChange} 
-                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderRight: '1px solid #eee', paddingRight: '20px' }}>
+                <label style={{ fontWeight: 'bold', color: '#555' }}>Mode:</label>
+                <select 
+                    name="generation_mode" 
+                    value={config.generation_mode} 
+                    onChange={handleChange}
+                    style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                    <option value="random">Random Sampling</option>
+                    <option value="systematic">Systematic (All Words)</option>
+                </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label style={{ fontWeight: 'bold', color: '#555' }}>Sequence Length: </label>
-            <input 
-                type="number" 
-                name="sequence_len" 
-                value={config.sequence_len} 
-                onChange={handleChange} 
-                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }}
-            />
-            </div>
+
+            {config.generation_mode === 'random' ? (
+                <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ fontWeight: 'bold', color: '#555' }}>Batch Size:</label>
+                    <input 
+                        type="number" 
+                        name="batch_size" 
+                        value={config.batch_size} 
+                        onChange={handleChange} 
+                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '80px' }}
+                    />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ fontWeight: 'bold', color: '#555' }}>Seq Length:</label>
+                    <input 
+                        type="number" 
+                        name="sequence_len" 
+                        value={config.sequence_len} 
+                        onChange={handleChange} 
+                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '80px' }}
+                    />
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ fontWeight: 'bold', color: '#555' }}>Word Length:</label>
+                    <input 
+                        type="number" 
+                        name="max_len" 
+                        value={config.max_len} 
+                        onChange={handleChange} 
+                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '80px' }}
+                    />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ fontWeight: 'bold', color: '#555' }}>Max Words:</label>
+                    <input 
+                        type="number" 
+                        name="max_words" 
+                        value={config.max_words} 
+                        onChange={handleChange} 
+                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '80px' }}
+                    />
+                    </div>
+                </>
+            )}
             
             <div style={{ flex: 1 }}></div>
 

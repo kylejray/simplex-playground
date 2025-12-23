@@ -260,15 +260,14 @@ def abc_ratio(a: int = 4, b: int = 2, c: int = 1, d: int = 4, e: int = 2, f: int
                 matrices[k][row, col] = pieces[piece_index]
                 
     return np.array(matrices)
-def rank1_predefined(p_scale: float, n_scale: float, a: float, 
-                     ratio_a: float, ratio_b: float, ratio_c: float) -> np.ndarray:
+def rank1_predefined(p_scale: float = 0.5, a: float = 0.5, 
+                     ratio_a: float = 1, ratio_b: float = 1, ratio_c: float = 1, **kwargs) -> np.ndarray:
     """
     Generates 3 symbol matrices that sum to a specific Rank-1 transition matrix.
     Uses a P/N set distribution with permutations to ensure variety.
     
     Args:
         p_scale: Scale factor for P (0 to 1)
-        n_scale: Scale factor for N (0 to 1)
         a: Splitting factor (0 to 1)
         ratio_a, ratio_b, ratio_c: Ratios for the target rank-1 vector
     """
@@ -288,7 +287,7 @@ def rank1_predefined(p_scale: float, n_scale: float, a: float,
     
     # 3. Set actual P and N
     P = p_scale * p_max
-    N = -1 * n_scale * n_max
+    N = -1 * 1.0 * n_max # n_scale is always 1.0
     
     # 4. Create P-set and N-set (sum to 0)
     p_set = np.array([P, -(1-a)*P, -a*P])
@@ -308,6 +307,70 @@ def rank1_predefined(p_scale: float, n_scale: float, a: float,
             raw_matrices[0, i, j] = vals_permuted[0]
             raw_matrices[1, i, j] = vals_permuted[1]
             raw_matrices[2, i, j] = vals_permuted[2]
+
+    # 6. Add 1/3 of T to each symbol matrix
+    final_matrices = np.zeros_like(raw_matrices)
+    for k in range(3):
+        final_matrices[k] = raw_matrices[k] + (1/3) * T
+        
+    return final_matrices
+
+def rank1_xmas(scale_a: float = 0.9, scale_b: float = 0.9, 
+               s1: float = 0.5, s2: float = 0.5, s3: float = 0.5, 
+               ratios: list = None) -> np.ndarray:
+    """
+    Rank-1 net transition matrix generation method.
+    Ensures non-negative elements by scaling P and N relative to the target matrix T.
+    """
+    if ratios is None:
+        ratios = [11, 7, 7]
+        
+    # 1. Define the Rank 1 Matrix T
+    # Normalize ratios to get the stationary vector v
+    v = np.array(ratios, dtype=float)
+    v = v / v.sum()
+    
+    # T has rows equal to v (standard rank-1 transition matrix)
+    # T_ij = v_j
+    T = np.tile(v, (3, 1))
+
+    # Calculate max A
+    # Constraints from a_p_set (involves s1, affects cols 0 and 1)
+    # We have -A*s1 and -A*(1-s1) in columns 0 and 1
+    max_A_p = min(v[0], v[1]) / (3 * max(s1, 1-s1))
+    
+    # Constraints from a_m_set (involves -A, affects cols 0 and 2)
+    # We have -A in columns 0 and 2
+    max_A_m = min(v[0], v[2]) / 3
+    
+    max_A = min(max_A_p, max_A_m)
+    A = max_A * scale_a
+
+    # Calculate max B
+    # Constraints from b_set (involves s3, affects cols 1 and 2)
+    # We have -B*s3 and -B*(1-s3) in columns 1 and 2
+    max_B = min(v[1], v[2]) / (3 * max(s3, 1-s3))
+    B = max_B * scale_b
+
+    a_p_set = np.array([A, -A*(s1), -A*(1-s1)])
+    a_m_set = np.array([-A, A*(s2), A*(1-s2)])
+    b_set = np.array([B, -B*(s3), -B*(1-s3)])
+
+    # 5. Distribute these into Raw matrices
+    raw_matrices = np.zeros((3, 3, 3)) # (symbol, state_from, state_to)
+    
+    placements = [ [ [0,1,0], [1,1,1]],
+                [ [0,0,0], [1,0,2], [1,2,0],[2,2,2]],
+                [ [0,0,1], [2,1,2],[2,2,1]]
+        ]
+
+    value_sets = [a_p_set, a_m_set, b_set ]
+    for vals, places in zip(value_sets, placements):
+        for place in places:
+            k, i, j = place
+            vals_permuted = np.roll(vals, k)
+            raw_matrices[:, i, j] = vals_permuted
+
 
     # 6. Add 1/3 of T to each symbol matrix
     final_matrices = np.zeros_like(raw_matrices)

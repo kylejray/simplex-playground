@@ -324,6 +324,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             <option value="rank1">Rank-1 (Fuzzy)</option>
             <option value="abc_ratio">ABC Ratio</option>
             <option value="rank1_predefined">Rank-1 (Predefined)</option>
+            <option value="rank1-xmas">Rank-1 (Xmas)</option>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -580,23 +581,11 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 max="1" 
                 step="0.01" 
                 name="p_scale" 
-                value={config.p_scale || 1.0} 
+                value={config.p_scale !== undefined ? config.p_scale : 0.5} 
                 onChange={handleConfigChange} 
                 style={{ width: '80px' }}
               />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>N Scale:</label>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.01" 
-                name="n_scale" 
-                value={config.n_scale || 1.0} 
-                onChange={handleConfigChange} 
-                style={{ width: '80px' }}
-              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.p_scale !== undefined ? config.p_scale : 0.5}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Split (a):</label>
@@ -610,6 +599,94 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 onChange={handleConfigChange} 
                 style={{ width: '80px' }}
               />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.a}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>A:</label>
+              <input type="number" min="1" max="50" name="ratio_a" value={config.ratio_a} onChange={handleConfigChange} style={{ width: '40px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>B:</label>
+              <input type="number" min="1" max="50" name="ratio_b" value={config.ratio_b} onChange={handleConfigChange} style={{ width: '40px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>C:</label>
+              <input type="number" min="1" max="50" name="ratio_c" value={config.ratio_c} onChange={handleConfigChange} style={{ width: '40px' }} />
+            </div>
+          </>
+        )}
+
+        {config.preset === 'rank1-xmas' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Scale A:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="scale_a" 
+                value={config.scale_a !== undefined ? config.scale_a : 0.9} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.scale_a !== undefined ? config.scale_a : 0.9}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '60px' }}>Scale B:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="scale_b" 
+                value={config.scale_b !== undefined ? config.scale_b : 0.9} 
+                onChange={handleConfigChange} 
+                style={{ width: '80px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.scale_b !== undefined ? config.scale_b : 0.9}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>S1:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="s1" 
+                value={config.s1 !== undefined ? config.s1 : 0.5} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.s1 !== undefined ? config.s1 : 0.5}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>S2:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="s2" 
+                value={config.s2 !== undefined ? config.s2 : 0.5} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.s2 !== undefined ? config.s2 : 0.5}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>S3:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                name="s3" 
+                value={config.s3 !== undefined ? config.s3 : 0.5} 
+                onChange={handleConfigChange} 
+                style={{ width: '60px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.s3 !== undefined ? config.s3 : 0.5}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>A:</label>

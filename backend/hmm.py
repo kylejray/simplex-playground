@@ -215,3 +215,98 @@ class HiddenMarkovModel:
             constrained_beliefs.append(seq_beliefs)
             
         return constrained_beliefs
+
+    def generate_systematic(self, max_len=10, max_count=1000):
+        """
+        Systematically generate all possible observation sequences of length max_len,
+        limited by max_count.
+        """
+        import itertools
+        words = []
+        count = 0
+        
+        # Generate words of exactly max_len
+        for seq in itertools.product(range(self.num_symbols), repeat=max_len):
+            if count >= max_count:
+                break
+            
+            word = "".join(str(s) for s in seq)
+            words.append(word)
+            count += 1
+        
+        batch_size = len(words)
+        if batch_size == 0:
+            return [], [], [], self.initial_state.tolist()
+            
+        belief_states_list = []
+        
+        # Standard belief update
+        for word in words:
+            seq_beliefs = []
+            current_belief = self.initial_state
+            
+            for char in word:
+                symbol = int(char)
+                T = self.transition_matrices[symbol]
+                
+                # Update
+                next_belief = current_belief @ T
+                
+                # Normalize
+                norm = np.sum(next_belief)
+                if norm > 0:
+                    next_belief /= norm
+                else:
+                    next_belief = self.initial_state
+                
+                current_belief = next_belief
+                seq_beliefs.append(current_belief.tolist())
+            
+            belief_states_list.append(seq_beliefs)
+            
+        # Constrained beliefs
+        constrained_beliefs_list = []
+        
+        # Precompute local posteriors
+        local_posteriors = np.zeros((self.num_symbols, self.num_states))
+        for k in range(self.num_symbols):
+            joint = self.initial_state @ self.transition_matrices[k]
+            norm = np.sum(joint)
+            if norm > 0:
+                local_posteriors[k] = joint / norm
+            else:
+                local_posteriors[k] = self.initial_state
+
+        # Precompute powers of T
+        max_seq_len = len(words[-1]) if words else 0
+        T_powers = [np.eye(self.num_states)]
+        curr_T = np.eye(self.num_states)
+        for _ in range(max_seq_len):
+            curr_T = curr_T @ self.state_transition_matrix
+            T_powers.append(curr_T)
+            
+        for word in words:
+            seq_obs = [int(c) for c in word]
+            seq_len = len(seq_obs)
+            seq_constrained = []
+            
+            for d in range(seq_len):
+                r_d = self.initial_state.copy()
+                for s in range(d + 1):
+                    z_s = seq_obs[s]
+                    posterior = local_posteriors[z_s]
+                    propagated = posterior @ T_powers[d - s]
+                    contribution = propagated - self.initial_state
+                    r_d += contribution
+                
+                r_d = np.maximum(r_d, 0)
+                norm = np.sum(r_d)
+                if norm > 0:
+                    r_d /= norm
+                else:
+                    r_d = self.initial_state.copy()
+                seq_constrained.append(r_d.tolist())
+            
+            constrained_beliefs_list.append(seq_constrained)
+            
+        return words, belief_states_list, constrained_beliefs_list, self.initial_state.tolist()
