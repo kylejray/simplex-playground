@@ -217,28 +217,29 @@ def rank1(n_states: int = 3, n_symbols: int = 3,
     return np.array(matrix_list)
 
 
-def abc_ratio(a: int = 4, b: int = 2, c: int = 1, d: int = 4, e: int = 2, f: int = 1) -> np.ndarray:
+def abc_ratio(ratio_a: int = 4, ratio_b: int = 2, ratio_c: int = 1, 
+              ratio_d: int = 4, ratio_e: int = 2, ratio_f: int = 1, **kwargs) -> np.ndarray:
     """
     Generates 3 symbol-labeled transition matrices based on ratios.
     
-    1. The Full Transition Matrix (sum) is Rank-1 with column probabilities proportional to [a, b, c].
-    2. Each cell (i, j) is split into 3 parts with ratios [d, e, f].
+    1. The Full Transition Matrix (sum) is Rank-1 with column probabilities proportional to [ratio_a, ratio_b, ratio_c].
+    2. Each cell (i, j) is split into 3 parts with ratios [ratio_d, ratio_e, ratio_f].
     3. These parts are assigned to symbols cyclically to ensure the symbol matrices are High-Rank.
     
     Args:
-        a, b, c (int): The ratios for destination state probabilities (1-50 each).
-        d, e, f (int): The ratios for symbol emission splitting (1-50 each).
+        ratio_a, ratio_b, ratio_c (int): The ratios for destination state probabilities (1-50 each).
+        ratio_d, ratio_e, ratio_f (int): The ratios for symbol emission splitting (1-50 each).
                          
     Returns:
         np.ndarray: Array of shape (3, 3, 3) containing three symbol matrices.
     """
     # 1. Normalize ABC to create destination state probability distribution
-    total_abc = a + b + c
-    base_probs = np.array([a, b, c]) / total_abc
+    total_abc = ratio_a + ratio_b + ratio_c
+    base_probs = np.array([ratio_a, ratio_b, ratio_c]) / total_abc
     
     # 2. Normalize DEF for the symbol splitting
-    total_def = d + e + f
-    split_factors = np.array([d, e, f]) / total_def
+    total_def = ratio_d + ratio_e + ratio_f
+    split_factors = np.array([ratio_d, ratio_e, ratio_f]) / total_def
     
     # Initialize the 3 symbol matrices
     matrices = [np.zeros((3, 3)) for _ in range(3)]
@@ -317,13 +318,12 @@ def rank1_predefined(p_scale: float = 0.5, a: float = 0.5,
 
 def rank1_xmas(scale_a: float = 0.9, scale_b: float = 0.9, 
                s1: float = 0.5, s2: float = 0.5, s3: float = 0.5, 
-               ratios: list = None) -> np.ndarray:
+               ratio_a: float = 11, ratio_b: float = 7, ratio_c: float = 7, **kwargs) -> np.ndarray:
     """
     Rank-1 net transition matrix generation method.
     Ensures non-negative elements by scaling P and N relative to the target matrix T.
     """
-    if ratios is None:
-        ratios = [11, 7, 7]
+    ratios = [ratio_a, ratio_b, ratio_c]
         
     # 1. Define the Rank 1 Matrix T
     # Normalize ratios to get the stationary vector v

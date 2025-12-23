@@ -179,11 +179,9 @@ function App() {
             s1: parseFloat(config.s1 || 0.5),
             s2: parseFloat(config.s2 || 0.5),
             s3: parseFloat(config.s3 || 0.5),
-            ratios: [
-                parseFloat(config.ratio_a || 1),
-                parseFloat(config.ratio_b || 1),
-                parseFloat(config.ratio_c || 1)
-            ]
+            ratio_a: parseFloat(config.ratio_a || 11),
+            ratio_b: parseFloat(config.ratio_b || 7),
+            ratio_c: parseFloat(config.ratio_c || 7)
           };
         }
         
