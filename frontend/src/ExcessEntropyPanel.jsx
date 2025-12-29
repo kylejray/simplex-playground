@@ -231,12 +231,15 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let receivedResult = false;
+      let accumulatedProgress = [];
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
+        
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+        }
         
         // Process complete SSE messages
         const lines = buffer.split('\n\n');
@@ -249,22 +252,77 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
               
               if (data.type === 'progress') {
                 setCurrentL(data.L);
-                setProgressLog(prev => [...prev, {
+                accumulatedProgress.push({
                   L: data.L,
                   H: data.H,
                   method: data.method,
                   time: data.time
-                }]);
+                });
+                setProgressLog([...accumulatedProgress]);
               } else if (data.type === 'result') {
                 setResult(data.data);
+                receivedResult = true;
               } else if (data.type === 'error') {
                 setError(`Computation failed: ${data.message}`);
               }
             } catch (e) {
-              console.error('Error parsing SSE data:', e);
+              console.error('Error parsing SSE data:', e, 'Raw line:', line);
             }
           }
         }
+        
+        if (done) break;
+      }
+      
+      // Process any remaining data in buffer
+      if (buffer.trim()) {
+        const remainingLines = buffer.split('\n\n');
+        for (const line of remainingLines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              if (data.type === 'result') {
+                setResult(data.data);
+                receivedResult = true;
+              } else if (data.type === 'progress') {
+                accumulatedProgress.push({
+                  L: data.L,
+                  H: data.H,
+                  method: data.method,
+                  time: data.time
+                });
+              }
+            } catch (e) {
+              console.error('Error parsing remaining buffer:', e);
+            }
+          }
+        }
+      }
+      
+      // Fallback: if we got progress but no result, compute result from accumulated data
+      if (!receivedResult && accumulatedProgress.length >= 2) {
+        console.warn('SSE stream ended without result message, computing from progress data');
+        const blockEntropies = [[0, 0.0, 'exact', 0]].concat(
+          accumulatedProgress.map(p => [p.L, p.H, p.method, p.time])
+        );
+        
+        // Compute entropy rate from last 2 points
+        const n = accumulatedProgress.length;
+        const last = accumulatedProgress[n - 1];
+        const secondLast = accumulatedProgress[n - 2];
+        const h_mu = (last.H - secondLast.H) / (last.L - secondLast.L);
+        const E = last.H - h_mu * last.L;
+        
+        // Find where MC started
+        const mcStart = accumulatedProgress.find(p => p.method === 'mc');
+        
+        setResult({
+          excess_entropy: E,
+          entropy_rate: h_mu,
+          block_entropies: blockEntropies,
+          mc_start_L: mcStart ? mcStart.L : null,
+          computation_time: accumulatedProgress.reduce((sum, p) => sum + p.time, 0)
+        });
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
