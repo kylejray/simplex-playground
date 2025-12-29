@@ -39,7 +39,7 @@ class PresetRequest(BaseModel):
 class ExcessEntropyRequest(BaseModel):
     matrices: list
     max_block_length: int = 20
-    max_time_per_L: float = 8.0  # seconds before switching to MC
+    max_time_per_L: float = 2.0  # seconds before switching to MC
     mc_samples: int = 10000
 
 def get_matrices_array(key, kwargs):
@@ -123,7 +123,10 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
     Compute excess entropy with streaming progress updates.
     Uses Server-Sent Events (SSE) to report progress for each L.
     Switches from exact enumeration to Monte Carlo when a single L takes longer than max_time_per_L.
+    Sends heartbeat messages every 5 seconds during long computations to prevent proxy timeouts.
     """
+    import concurrent.futures
+    
     async def generate():
         try:
             # Convert list back to numpy array
@@ -135,12 +138,40 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
             use_mc = False
             total_start = time.time()
             
+            # Use a thread pool to run blocking computations
+            loop = asyncio.get_event_loop()
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            
             for L in range(1, request.max_block_length + 1):
                 L_start = time.time()
                 
                 if not use_mc:
-                    # Try exact enumeration
-                    H_L = hmm._compute_block_entropy_exact(L)
+                    # Run exact enumeration in a thread so we can send heartbeats
+                    future = loop.run_in_executor(
+                        executor, 
+                        hmm._compute_block_entropy_exact, 
+                        L
+                    )
+                    
+                    # Send heartbeats while waiting for computation
+                    heartbeat_interval = 2.0  # seconds
+                    while True:
+                        try:
+                            H_L = await asyncio.wait_for(
+                                asyncio.shield(future), 
+                                timeout=heartbeat_interval
+                            )
+                            break  # Computation finished
+                        except asyncio.TimeoutError:
+                            # Send heartbeat to keep connection alive
+                            heartbeat = {
+                                'type': 'heartbeat',
+                                'L': L,
+                                'elapsed': time.time() - L_start,
+                                'method': 'exact'
+                            }
+                            yield f"data: {json.dumps(heartbeat)}\n\n"
+                    
                     L_time = time.time() - L_start
                     block_entropies.append((L, H_L, 'exact', L_time))
                     
@@ -149,10 +180,35 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
                         use_mc = True
                         mc_start_L = L + 1
                 else:
-                    # Use Monte Carlo
+                    # Use Monte Carlo (also in thread for consistency)
                     if mc_start_L is None:
                         mc_start_L = L
-                    H_L = hmm._compute_block_entropy_mc(L, request.mc_samples)
+                    
+                    future = loop.run_in_executor(
+                        executor,
+                        hmm._compute_block_entropy_mc,
+                        L,
+                        request.mc_samples
+                    )
+                    
+                    # Send heartbeats while waiting
+                    heartbeat_interval = 2.0
+                    while True:
+                        try:
+                            H_L = await asyncio.wait_for(
+                                asyncio.shield(future),
+                                timeout=heartbeat_interval
+                            )
+                            break
+                        except asyncio.TimeoutError:
+                            heartbeat = {
+                                'type': 'heartbeat',
+                                'L': L,
+                                'elapsed': time.time() - L_start,
+                                'method': 'mc'
+                            }
+                            yield f"data: {json.dumps(heartbeat)}\n\n"
+                    
                     L_time = time.time() - L_start
                     block_entropies.append((L, H_L, 'mc', L_time))
                 
@@ -166,6 +222,8 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
                 }
                 yield f"data: {json.dumps(progress)}\n\n"
                 await asyncio.sleep(0)  # Allow other tasks to run
+            
+            executor.shutdown(wait=False)
             
             # Compute final result
             result = hmm._finalize_excess_entropy(

@@ -170,7 +170,7 @@ const spinnerKeyframes = `
 function ExcessEntropyPanel({ matrices, result, setResult }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [maxTimePerL, setMaxTimePerL] = useState(8);  // seconds
+  const [maxTimePerL, setMaxTimePerL] = useState(2);  // seconds
   const [mcSamples, setMcSamples] = useState(10000);
   const [maxBlockLength, setMaxBlockLength] = useState(20);
   const [progressLog, setProgressLog] = useState([]);
@@ -259,6 +259,11 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
                   time: data.time
                 });
                 setProgressLog([...accumulatedProgress]);
+              } else if (data.type === 'heartbeat') {
+                // Heartbeat keeps connection alive during long computations
+                // Update UI to show computation is still running
+                setCurrentL(data.L);
+                console.log(`Heartbeat: L=${data.L}, elapsed=${data.elapsed.toFixed(1)}s (${data.method})`);
               } else if (data.type === 'result') {
                 setResult(data.data);
                 receivedResult = true;
@@ -291,6 +296,8 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
                   method: data.method,
                   time: data.time
                 });
+              } else if (data.type === 'heartbeat') {
+                // Ignore heartbeat in remaining buffer
               }
             } catch (e) {
               console.error('Error parsing remaining buffer:', e);
