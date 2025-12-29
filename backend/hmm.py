@@ -310,3 +310,165 @@ class HiddenMarkovModel:
             constrained_beliefs_list.append(seq_constrained)
             
         return words, belief_states_list, constrained_beliefs_list, self.initial_state.tolist()
+
+    def compute_excess_entropy(self, max_block_length=20, max_samples=10000):
+        """
+        Compute excess entropy using a two-phase approach:
+        1. Exact enumeration for small L where num_sequences <= max_samples
+        2. Monte Carlo sampling for large L where enumeration is too expensive
+        
+        Args:
+            max_block_length: Maximum sequence length L to compute
+            max_samples: Maximum samples per length (also threshold for switching to MC)
+            
+        Returns:
+            dict with keys:
+                - excess_entropy: Estimated E value
+                - entropy_rate: Estimated h_mu
+                - block_entropies: List of (L, H_L, method) tuples
+                - max_samples: Number of max samples used
+                - mc_start_L: Block length where Monte Carlo begins (None if all enumerated)
+        """
+        block_entropies = [(0, 0.0, 'exact')]  # H(X_0^0) = 0 by definition
+        mc_start_L = None
+        
+        for L in range(1, max_block_length + 1):
+            num_sequences = self.num_symbols ** L
+            
+            if num_sequences <= max_samples:
+                # Phase 1: Exact enumeration
+                H_L = self._compute_block_entropy_exact(L)
+                block_entropies.append((L, H_L, 'exact'))
+            else:
+                # Phase 2: Monte Carlo sampling
+                if mc_start_L is None:
+                    mc_start_L = L
+                H_L = self._compute_block_entropy_mc(L, max_samples)
+                block_entropies.append((L, H_L, 'mc'))
+                
+        return self._finalize_excess_entropy(block_entropies, max_samples, mc_start_L)
+    
+    def _compute_block_entropy_exact(self, L):
+        """
+        Compute exact block entropy H(X_0^L) by enumerating all sequences.
+        """
+        import itertools
+        
+        total_entropy = 0.0
+        
+        for seq in itertools.product(range(self.num_symbols), repeat=L):
+            # Compute P(sequence) using forward algorithm
+            prob = self._sequence_probability(seq)
+            
+            if prob > 1e-300:
+                total_entropy -= prob * np.log2(prob)
+        
+        return total_entropy
+    
+    def _sequence_probability(self, seq):
+        """
+        Compute exact probability of a symbol sequence P(x_1, ..., x_L).
+        """
+        # Start from stationary distribution
+        state_probs = self.initial_state.copy()
+        
+        for symbol in seq:
+            # P(x_t, s_t | x_1..x_{t-1}) = sum_s P(s_{t-1}=s) * T[symbol, s, :]
+            # Then marginalize over s_t to get P(x_t | x_1..x_{t-1})
+            joint = state_probs @ self.transition_matrices[symbol]
+            prob_symbol = np.sum(joint)
+            
+            if prob_symbol < 1e-300:
+                return 0.0
+            
+            # Update state distribution
+            state_probs = joint / prob_symbol
+        
+        # The sequence probability is product of conditional probabilities
+        # which we can compute by tracking the unnormalized forward variable
+        alpha = self.initial_state.copy()
+        for symbol in seq:
+            alpha = alpha @ self.transition_matrices[symbol]
+        
+        return np.sum(alpha)
+    
+    def _compute_block_entropy_mc(self, L, n_samples):
+        """
+        Estimate block entropy H(X_0^L) using Monte Carlo sampling.
+        """
+        log_probs = []
+        
+        for _ in range(n_samples):
+            current_state_probs = self.initial_state.copy()
+            log_prob = 0.0
+            
+            for t in range(L):
+                # Compute joint distribution over (symbol, next_state)
+                joint = np.einsum('s,kso->ko', current_state_probs, self.transition_matrices)
+                
+                # Sample from joint distribution
+                flat_joint = joint.flatten()
+                flat_joint = np.maximum(flat_joint, 0)
+                flat_sum = np.sum(flat_joint)
+                if flat_sum < 1e-300:
+                    log_prob = -np.inf
+                    break
+                flat_joint = flat_joint / flat_sum
+                idx = np.random.choice(len(flat_joint), p=flat_joint)
+                symbol = idx // self.num_states
+                
+                # Compute probability of this symbol
+                symbol_prob = np.sum(joint[symbol])
+                if symbol_prob < 1e-300:
+                    log_prob = -np.inf
+                    break
+                    
+                log_prob += np.log2(symbol_prob)
+                
+                # Update state distribution
+                current_state_probs = joint[symbol] / symbol_prob
+            
+            if np.isfinite(log_prob):
+                log_probs.append(log_prob)
+        
+        if len(log_probs) > 0:
+            return -np.mean(log_probs)
+        return 0.0
+    
+    def _finalize_excess_entropy(self, block_entropies, max_samples, mc_start_L):
+        
+        """
+        Compute final excess entropy and entropy rate from block entropies.
+        Uses linear fit on last 2 points for h_mu: H(L) = h_mu * L + E
+        """
+        n_points = len(block_entropies)
+        
+        if n_points >= 2:
+            # Use only the LAST TWO block entropy points for linear fit
+            # H(L) = h_mu * L + E
+            # Slope h_mu = (H_2 - H_1) / (L_2 - L_1)
+            L1, H1, _ = block_entropies[-2]
+            L2, H2, _ = block_entropies[-1]
+            
+            h_mu = (H2 - H1) / (L2 - L1) if L2 != L1 else 0
+            
+            # Compute E as y-intercept: E = H - h_mu * L (using last point)
+            E = H2 - h_mu * L2
+        elif n_points == 1:
+            L, H, _ = block_entropies[0]
+            h_mu = H / L if L > 0 else 0
+            E = 0
+        else:
+            h_mu = 0
+            E = 0
+        
+        # Convert to output format (L, H, method)
+        output_entropies = [(L, H, method) for L, H, method in block_entropies]
+        
+        return {
+            'excess_entropy': float(E),
+            'entropy_rate': float(h_mu),
+            'block_entropies': output_entropies,
+            'max_samples': max_samples,
+            'mc_start_L': mc_start_L
+        }

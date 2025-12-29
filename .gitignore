@@ -17,3 +17,10 @@ dist/
 # IDE
 .vscode/
 .idea/
+
+# Development/test files
+test_api.py
+visualization.py
+backend/rank1_tests.py
+backend/rank1_santa.py
+*.png

@@ -3,6 +3,7 @@ import Plot from 'react-plotly.js';
 import axios from 'axios';
 import MatrixEditor from './MatrixEditor';
 import BeliefVisualizer from './BeliefVisualizer';
+import ExcessEntropyPanel from './ExcessEntropyPanel';
 
 const DEFAULT_MATRICES = [
   [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -11,8 +12,6 @@ const DEFAULT_MATRICES = [
 ];
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-
-console.log('Current API_URL:', API_URL);
 
 const STYLES = {
   wordListContainer: {
@@ -77,6 +76,7 @@ function App() {
     y: 0.7,
     a: 0.6,
     b: 0.0,
+    p: 0.5, // For test processes (even, golden mean)
     // Cyclic rank1 params
     n_states: 3,
     n_symbols: 3,
@@ -100,6 +100,9 @@ function App() {
         abc_ratio: { ratio_a: 20, ratio_b: 6, ratio_c: 6, ratio_d: 6, ratio_e: 1, ratio_f: 1 },
         rank1_predefined: { p_scale: 0.5, a: 0.5, ratio_a: 1, ratio_b: 1, ratio_c: 1 },
         'rank1-xmas': { scale_a: 0.9, scale_b: 0.9, s1: 0.5, s2: 0.5, s3: 0.5, ratio_a: 11, ratio_b: 7, ratio_c: 7 },
+        even_process: { p: 0.5 },
+        golden_mean: { p: 0.5 },
+        rrxor: {},
         custom: {}
     },
     generation_mode: 'random', // 'random' or 'systematic'
@@ -123,6 +126,13 @@ function App() {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('2d'); // '2d' or '3d'
   const [beliefMode, setBeliefMode] = useState('standard'); // 'standard' or 'constrained'
+  const [activeTab, setActiveTab] = useState('beliefs'); // 'beliefs' or 'entropy'
+  const [excessEntropyResult, setExcessEntropyResult] = useState(null);
+
+  // Invalidate excess entropy cache when matrices change
+  useEffect(() => {
+    setExcessEntropyResult(null);
+  }, [matrices]);
 
   // Fetch preset matrices when preset or params change
   useEffect(() => {
@@ -184,6 +194,7 @@ function App() {
             ratio_c: parseFloat(config.ratio_c || 7)
           };
         }
+        // even_process, golden_mean, and rrxor have no parameters
         
         const response = await axios.post(`${API_URL}/get_preset`, payload);
         setMatrices(response.data);
@@ -194,7 +205,7 @@ function App() {
     };
 
     fetchPreset();
-  }, [config.preset, config.x, config.y, config.a, config.b, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f, config.p_scale, config.n_scale, config.scale_a, config.scale_b, config.s1, config.s2, config.s3, config.generation_mode, config.max_words, config.max_len]);
+  }, [config.preset, config.x, config.y, config.a, config.b, config.p, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f, config.p_scale, config.n_scale, config.scale_a, config.scale_b, config.s1, config.s2, config.s3, config.generation_mode, config.max_words, config.max_len]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -474,6 +485,60 @@ function App() {
         
         {/* Left Column: Plot */}
         <div style={{ flex: 1, minWidth: '800px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Tab Navigation */}
+            <div style={{ display: 'flex', gap: '0', borderBottom: '2px solid #eee' }}>
+              <button
+                onClick={() => setActiveTab('beliefs')}
+                style={{
+                  padding: '12px 24px',
+                  background: activeTab === 'beliefs' ? 'white' : '#f5f5f5',
+                  border: 'none',
+                  borderBottom: activeTab === 'beliefs' ? '2px solid #007bff' : '2px solid transparent',
+                  marginBottom: '-2px',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'beliefs' ? 'bold' : 'normal',
+                  color: activeTab === 'beliefs' ? '#007bff' : '#666',
+                  fontSize: '14px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Belief Space
+              </button>
+              <button
+                onClick={() => setActiveTab('entropy')}
+                style={{
+                  padding: '12px 24px',
+                  background: activeTab === 'entropy' ? 'white' : '#f5f5f5',
+                  border: 'none',
+                  borderBottom: activeTab === 'entropy' ? '2px solid #28a745' : '2px solid transparent',
+                  marginBottom: '-2px',
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'entropy' ? 'bold' : 'normal',
+                  color: activeTab === 'entropy' ? '#28a745' : '#666',
+                  fontSize: '14px',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                Excess Entropy
+                {excessEntropyResult && (
+                  <span style={{
+                    background: '#28a745',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '11px'
+                  }}>
+                    E={excessEntropyResult.excess_entropy.toFixed(3)}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Belief Space Tab Content */}
+            {activeTab === 'beliefs' && (
             <div style={{ 
                 background: 'white', 
                 padding: '10px', 
@@ -526,7 +591,8 @@ function App() {
                     </div>
                 )}
 
-                {/* Belief Visualizer (Inset top right) */}
+                {/* Belief Visualizer (Inset top right) - only for 3-state machines */}
+                {matrices && matrices[0] && matrices[0].length === 3 && (
                 <div style={{
                     position: 'absolute',
                     top: '90px',
@@ -541,7 +607,18 @@ function App() {
                         showButton={true}
                     />
                 </div>
+                )}
             </div>
+            )}
+
+            {/* Excess Entropy Tab Content */}
+            {activeTab === 'entropy' && (
+              <ExcessEntropyPanel 
+                matrices={matrices}
+                result={excessEntropyResult}
+                setResult={setExcessEntropyResult}
+              />
+            )}
 
             {/* Generated Words (Moved here) */}
             {words.length > 0 && (

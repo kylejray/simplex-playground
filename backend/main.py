@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import numpy as np
 from hmm import HiddenMarkovModel
@@ -8,6 +9,8 @@ import matrices
 import json
 import os
 import sys
+import time
+import asyncio
 
 print("Starting FastAPI application...", file=sys.stderr)
 
@@ -33,6 +36,12 @@ class PresetRequest(BaseModel):
     key: str
     kwargs: dict = {}
 
+class ExcessEntropyRequest(BaseModel):
+    matrices: list
+    max_block_length: int = 20
+    max_time_per_L: float = 8.0  # seconds before switching to MC
+    mc_samples: int = 10000
+
 def get_matrices_array(key, kwargs):
     if key == 'mess3':
         return mess3(**kwargs)
@@ -48,6 +57,12 @@ def get_matrices_array(key, kwargs):
         return matrices.rank1_predefined(**kwargs)
     if key == 'rank1-xmas':
         return matrices.rank1_xmas(**kwargs)
+    if key == 'even_process':
+        return matrices.even_process(**kwargs)
+    if key == 'golden_mean':
+        return matrices.golden_mean(**kwargs)
+    if key == 'rrxor':
+        return matrices.rrxor()
     raise ValueError(f"Unknown matrix key: {key}")
 
 @app.post("/get_preset")
@@ -101,6 +116,87 @@ async def generate_data(request: GenerateRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/excess_entropy")
+async def compute_excess_entropy(request: ExcessEntropyRequest):
+    """
+    Compute excess entropy with streaming progress updates.
+    Uses Server-Sent Events (SSE) to report progress for each L.
+    Switches from exact enumeration to Monte Carlo when a single L takes longer than max_time_per_L.
+    """
+    async def generate():
+        try:
+            # Convert list back to numpy array
+            matrix_params = np.array(request.matrices)
+            hmm = HiddenMarkovModel(matrix_params)
+            
+            block_entropies = [(0, 0.0, 'exact', 0.0)]  # (L, H, method, time)
+            mc_start_L = None
+            use_mc = False
+            total_start = time.time()
+            
+            for L in range(1, request.max_block_length + 1):
+                L_start = time.time()
+                
+                if not use_mc:
+                    # Try exact enumeration
+                    H_L = hmm._compute_block_entropy_exact(L)
+                    L_time = time.time() - L_start
+                    block_entropies.append((L, H_L, 'exact', L_time))
+                    
+                    # Check if this took too long - switch to MC for future L
+                    if L_time > request.max_time_per_L:
+                        use_mc = True
+                        mc_start_L = L + 1
+                else:
+                    # Use Monte Carlo
+                    if mc_start_L is None:
+                        mc_start_L = L
+                    H_L = hmm._compute_block_entropy_mc(L, request.mc_samples)
+                    L_time = time.time() - L_start
+                    block_entropies.append((L, H_L, 'mc', L_time))
+                
+                # Send progress update
+                progress = {
+                    'type': 'progress',
+                    'L': L,
+                    'H': H_L,
+                    'method': 'mc' if (use_mc or (mc_start_L and L >= mc_start_L)) else 'exact',
+                    'time': L_time
+                }
+                yield f"data: {json.dumps(progress)}\n\n"
+                await asyncio.sleep(0)  # Allow other tasks to run
+            
+            # Compute final result
+            result = hmm._finalize_excess_entropy(
+                [(L, H, m) for L, H, m, t in block_entropies],
+                request.mc_samples,
+                mc_start_L
+            )
+            
+            # Add timing info to block entropies
+            result['block_entropies'] = [(L, H, m, t) for L, H, m, t in block_entropies]
+            result['computation_time'] = time.time() - total_start
+            
+            # Send final result
+            final = {'type': 'result', 'data': result}
+            yield f"data: {json.dumps(final)}\n\n"
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            error = {'type': 'error', 'message': str(e)}
+            yield f"data: {json.dumps(error)}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @app.get("/")
 def read_root():

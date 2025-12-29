@@ -109,8 +109,12 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
     })
   );
 
-  const states = ['A', 'B', 'C'];
+  // Dynamic state labels based on number of states
+  const stateLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const states = stateLabels.slice(0, numStates);
+  const is3State = numStates === 3;
   
+  // Positions only used for 3-state HMM graph
   const positions = {
     0: { x: NODE_MARGIN, y: GRAPH_HEIGHT - NODE_MARGIN },      // A (Bottom Left)
     1: { x: GRAPH_WIDTH - NODE_MARGIN, y: GRAPH_HEIGHT - NODE_MARGIN }, // B (Bottom Right)
@@ -318,13 +322,20 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             onChange={handleConfigChange}
             style={{ padding: '5px 10px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
-            <option value="mess3">Mess 3</option>
-            <option value="left_right_mix">Left/Right Mix</option>
-            <option value="cyclic_rank1">Cyclic Rank-1</option>
-            <option value="rank1">Rank-1 (Fuzzy)</option>
-            <option value="abc_ratio">ABC Ratio</option>
-            <option value="rank1_predefined">Rank-1 (Predefined)</option>
-            <option value="rank1-xmas">Rank-1 (Xmas)</option>
+            <optgroup label="Test Processes">
+              <option value="even_process">Even Process (E≈0.92)</option>
+              <option value="golden_mean">Golden Mean (E≈0.25)</option>
+              <option value="rrxor">RRXOR (5-state, E=2)</option>
+            </optgroup>
+            <optgroup label="3-State Processes">
+              <option value="mess3">Mess 3</option>
+              <option value="left_right_mix">Left/Right Mix</option>
+              <option value="cyclic_rank1">Cyclic Rank-1</option>
+              <option value="rank1">Rank-1 (Fuzzy)</option>
+              <option value="abc_ratio">ABC Ratio</option>
+              <option value="rank1_predefined">Rank-1 (Predefined)</option>
+              <option value="rank1-xmas">Rank-1 (Xmas)</option>
+            </optgroup>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -716,7 +727,8 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '40px', alignItems: 'center' }}>
         
-        {/* Visual Graph */}
+        {/* Visual Graph - only for 3-state machines */}
+        {is3State ? (
         <div style={{ 
           width: '100%',
           display: 'flex',
@@ -800,6 +812,23 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
             ))}
           </svg>
         </div>
+        ) : (
+          <div style={{
+            padding: '30px',
+            background: '#f9f9f9',
+            borderRadius: '8px',
+            color: '#666',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
+              {numStates}-State Machine
+            </div>
+            <div style={{ fontSize: '14px' }}>
+              HMM graph visualization is only available for 3-state machines.
+              <br/>Use the matrix view below to edit transitions.
+            </div>
+          </div>
+        )}
 
         {/* Matrix Input (LaTeX style) */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '300px' }}>
@@ -826,7 +855,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: 'repeat(3, 1fr)', 
+                    gridTemplateColumns: `repeat(${numStates}, 1fr)`, 
                     gap: '15px',
                     padding: '20px 25px',
                     position: 'relative',

@@ -1,5 +1,87 @@
 import numpy as np
 
+
+def even_process(p: float = 0.5) -> np.ndarray:
+    """
+    Even Process: Binary process where 1s always come in pairs.
+    States: A (even parity - ready for 0 or start of 1-pair), B (odd parity - must emit another 1)
+    Alphabet: {0, 1}
+    
+    From state A: emit 0 -> stay A (prob 1-p), emit 1 -> go to B (prob p)
+    From state B: emit 1 -> go to A (prob 1, must complete the pair)
+    
+    Parameter p controls P(emit 1 | state A). Default 0.5.
+    Known excess entropy: E ≈ 0.92 bits (at p=0.5)
+    
+    T[k, i, j] = P(next_state=j, symbol=k | current_state=i)
+    """
+    return np.array([
+        # Symbol 0
+        [[1-p, 0],    # From A: emit 0 with prob 1-p, stay A
+         [0, 0]],     # From B: cannot emit 0
+        # Symbol 1  
+        [[0, p],      # From A: emit 1 with prob p, go to B
+         [1, 0]]      # From B: emit 1 with prob 1, go to A
+    ])
+
+
+def golden_mean(p: float = 0.5) -> np.ndarray:
+    """
+    Golden Mean Process: Binary process where '11' is forbidden.
+    States: A (can emit anything), B (just emitted 1, must emit 0 next)
+    Alphabet: {0, 1}
+    
+    From state A: emit 0 -> stay A, emit 1 -> go to B  
+    From state B: emit 0 -> go to A (cannot emit 1)
+    
+    Parameter p controls P(emit 1 | state A). Default 0.5.
+    Known excess entropy: E ≈ 0.2516 bits (at p=0.5)
+    
+    T[k, i, j] = P(next_state=j, symbol=k | current_state=i)
+    """
+    return np.array([
+        # Symbol 0
+        [[1-p, 0],    # From A: emit 0 with prob 1-p, stay A
+         [1, 0]],     # From B: emit 0 with prob 1, go to A
+        # Symbol 1
+        [[0, p],      # From A: emit 1 with prob p, go to B
+         [0, 0]]      # From B: cannot emit 1
+    ])
+
+
+def rrxor() -> np.ndarray:
+    """
+    Random-Random XOR (RRXOR) Process - 5-state epsilon machine.
+    
+    The process generates X_t = R_t XOR R_{t-1} where R_t are iid Bernoulli(1/2).
+    The epsilon machine has 5 causal states tracking mixed-state beliefs.
+    
+    States: 0, 1, 2, 3, 4
+    Alphabet: {0, 1}
+    
+    Known: h_mu = 1 bit/symbol, E = 2 bits
+    
+    T[k, i, j] = P(next_state=j, symbol=k | current_state=i)
+    """
+    T0 = np.array([
+        [0,   0.5, 0,   0,   0  ],  # From 0: -> 1
+        [0,   0,   0,   0,   0.5],  # From 1: -> 4
+        [0,   0,   0,   0.5, 0  ],  # From 2: -> 3
+        [0,   0,   0,   0,   0  ],  # From 3: (no 0 emission)
+        [1,   0,   0,   0,   0  ],  # From 4: -> 0
+    ])
+    
+    T1 = np.array([
+        [0,   0,   0.5, 0,   0  ],  # From 0: -> 2
+        [0,   0,   0,   0.5, 0  ],  # From 1: -> 3
+        [0,   0,   0,   0,   0.5],  # From 2: -> 4
+        [1,   0,   0,   0,   0  ],  # From 3: -> 0
+        [0,   0,   0,   0,   0  ],  # From 4: (no 1 emission)
+    ])
+    
+    return np.array([T0, T1])
+
+
 def mess3(x: float, a: float) -> np.ndarray:
     """
     Creates a transition matrix for the Mess3 Process.
