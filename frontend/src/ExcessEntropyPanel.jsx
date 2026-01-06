@@ -170,11 +170,14 @@ const spinnerKeyframes = `
 function ExcessEntropyPanel({ matrices, result, setResult }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [maxTimePerL, setMaxTimePerL] = useState(2);  // seconds
-  const [mcSamples, setMcSamples] = useState(10000);
+  const [sampleConstrained, setSampleConstrained] = useState(false);  // false = time constrained (default)
+  const [timeBudget, setTimeBudget] = useState(10);  // seconds for time constrained mode
+  const [maxTimePerL, setMaxTimePerL] = useState(2);  // seconds per L for sample constrained mode
+  const [mcSamples, setMcSamples] = useState(50000);
   const [maxBlockLength, setMaxBlockLength] = useState(20);
   const [progressLog, setProgressLog] = useState([]);
   const [currentL, setCurrentL] = useState(null);
+  const [currentELower, setCurrentELower] = useState(null);  // running E_lower estimate
   const abortControllerRef = useRef(null);
 
   const computeExcessEntropy = async () => {
@@ -182,6 +185,7 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
     setError(null);
     setProgressLog([]);
     setCurrentL(0);
+    setCurrentELower(null);
 
     try {
       // Normalize matrices before sending
@@ -219,7 +223,9 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
           matrices: normalizedMatrices,
           max_block_length: maxBlockLength,
           max_time_per_L: maxTimePerL,
-          mc_samples: mcSamples
+          mc_samples: mcSamples,
+          sample_constrained: sampleConstrained,
+          time_budget: timeBudget
         }),
         signal: abortControllerRef.current.signal
       });
@@ -252,11 +258,14 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
               
               if (data.type === 'progress') {
                 setCurrentL(data.L);
+                setCurrentELower(data.E_lower);
                 accumulatedProgress.push({
                   L: data.L,
                   H: data.H,
                   method: data.method,
-                  time: data.time
+                  time: data.time,
+                  E_lower: data.E_lower,
+                  h_estimate: data.h_estimate
                 });
                 setProgressLog([...accumulatedProgress]);
               } else if (data.type === 'heartbeat') {
@@ -452,37 +461,101 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
 
       {/* Controls */}
       <div style={PANEL_STYLES.controls}>
+        {/* Mode Toggle */}
         <div style={PANEL_STYLES.controlGroup}>
-          <label style={PANEL_STYLES.label}>
-            Max Wait Time: {maxTimePerL}s
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="30"
-            step="1"
-            value={maxTimePerL}
-            onChange={(e) => setMaxTimePerL(parseInt(e.target.value))}
-            style={PANEL_STYLES.slider}
-            disabled={loading}
-          />
+          <label style={PANEL_STYLES.label}>Mode</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setSampleConstrained(false)}
+              style={{
+                padding: '6px 12px',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                background: !sampleConstrained ? '#667eea' : '#e0e0e0',
+                color: !sampleConstrained ? 'white' : '#666',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}
+              disabled={loading}
+            >
+              Time Constrained
+            </button>
+            <button
+              onClick={() => setSampleConstrained(true)}
+              style={{
+                padding: '6px 12px',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                background: sampleConstrained ? '#667eea' : '#e0e0e0',
+                color: sampleConstrained ? 'white' : '#666',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}
+              disabled={loading}
+            >
+              Sample Constrained
+            </button>
+          </div>
         </div>
 
-        <div style={PANEL_STYLES.controlGroup}>
-          <label style={PANEL_STYLES.label}>
-            MC Samples: {mcSamples.toLocaleString()}
-          </label>
-          <input
-            type="range"
-            min="1000"
-            max="100000"
-            step="1000"
-            value={mcSamples}
-            onChange={(e) => setMcSamples(parseInt(e.target.value))}
-            style={PANEL_STYLES.slider}
-            disabled={loading}
-          />
-        </div>
+        {/* Time Budget (for time constrained mode) */}
+        {!sampleConstrained && (
+          <div style={PANEL_STYLES.controlGroup}>
+            <label style={PANEL_STYLES.label}>
+              Time Budget: {timeBudget}s
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="60"
+              step="1"
+              value={timeBudget}
+              onChange={(e) => setTimeBudget(parseInt(e.target.value))}
+              style={PANEL_STYLES.slider}
+              disabled={loading}
+            />
+          </div>
+        )}
+
+        {/* Max Time Per L (for sample constrained mode) */}
+        {sampleConstrained && (
+          <div style={PANEL_STYLES.controlGroup}>
+            <label style={PANEL_STYLES.label}>
+              Max Time/L: {maxTimePerL}s
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="30"
+              step="1"
+              value={maxTimePerL}
+              onChange={(e) => setMaxTimePerL(parseInt(e.target.value))}
+              style={PANEL_STYLES.slider}
+              disabled={loading}
+            />
+          </div>
+        )}
+
+        {/* MC Samples (for sample constrained mode) */}
+        {sampleConstrained && (
+          <div style={PANEL_STYLES.controlGroup}>
+            <label style={PANEL_STYLES.label}>
+              MC Samples: {mcSamples.toLocaleString()}
+            </label>
+            <input
+              type="range"
+              min="1000"
+              max="100000"
+              step="1000"
+              value={mcSamples}
+              onChange={(e) => setMcSamples(parseInt(e.target.value))}
+              style={PANEL_STYLES.slider}
+              disabled={loading}
+            />
+          </div>
+        )}
 
         <div style={PANEL_STYLES.controlGroup}>
           <label style={PANEL_STYLES.label}>Max Block Length</label>
@@ -527,10 +600,15 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
           <div style={PANEL_STYLES.progressHeader}>
             <div style={PANEL_STYLES.progressTitle}>
               <div style={{...PANEL_STYLES.spinner, borderColor: '#004085', borderTopColor: '#004085'}}></div>
-              Computing L = {currentL || 1} of {maxBlockLength}...
+              Computing L = {currentL || 1}{!sampleConstrained ? '' : ` of ${maxBlockLength}`}...
             </div>
-            <div style={{ color: '#004085', fontSize: '13px' }}>
-              {progressLog.length > 0 && `${progressLog.length} completed`}
+            <div style={{ color: '#004085', fontSize: '13px', display: 'flex', gap: '20px' }}>
+              {progressLog.length > 0 && <span>{progressLog.length} completed</span>}
+              {currentELower !== null && (
+                <span style={{ fontWeight: 'bold' }}>
+                  E ≥ {currentELower.toFixed(4)}
+                </span>
+              )}
             </div>
           </div>
           {progressLog.length > 0 && (
@@ -539,7 +617,10 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
                 <div key={idx} style={PANEL_STYLES.progressLine}>
                   <span style={{ color: '#666', minWidth: '50px' }}>L={p.L}</span>
                   <span style={{ color: '#333', minWidth: '100px' }}>H={p.H.toFixed(4)}</span>
-                  <span style={{ 
+                  <span style={{ color: '#764ba2', minWidth: '100px' }}>
+                    E≥{p.E_lower?.toFixed(4) || '—'}
+                  </span>
+                  <span style={{
                     color: p.method === 'exact' ? '#28a745' : '#fd7e14',
                     minWidth: '60px'
                   }}>
@@ -558,21 +639,29 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
         <div style={PANEL_STYLES.resultCard}>
           <div style={PANEL_STYLES.resultItem}>
             <div style={PANEL_STYLES.resultValue}>
-              {result.excess_entropy.toFixed(4)}
+              {result.E_lower !== undefined ? '≥ ' : ''}{(result.E_lower ?? result.excess_entropy).toFixed(4)}
             </div>
-            <div style={PANEL_STYLES.resultLabel}>Excess Entropy E (bits)</div>
+            <div style={PANEL_STYLES.resultLabel}>
+              {result.E_lower !== undefined ? 'Excess Entropy Lower Bound (bits)' : 'Excess Entropy E (bits)'}
+            </div>
           </div>
           <div style={PANEL_STYLES.resultItem}>
             <div style={PANEL_STYLES.resultValue}>
-              {result.entropy_rate.toFixed(4)}
+              {(result.h_estimate ?? result.entropy_rate).toFixed(4)}
             </div>
             <div style={PANEL_STYLES.resultLabel}>Entropy Rate hμ (bits/symbol)</div>
           </div>
           <div style={PANEL_STYLES.resultItem}>
             <div style={PANEL_STYLES.resultValue}>
-              {result.mc_start_L ? `L≥${result.mc_start_L}` : 'All Exact'}
+              {result.mode === 'time_constrained' ? 'Time' : (result.mc_start_L ? `MC@L=${result.mc_start_L}` : 'Exact')}
             </div>
-            <div style={PANEL_STYLES.resultLabel}>{result.mc_start_L ? 'MC Started At' : 'Method'}</div>
+            <div style={PANEL_STYLES.resultLabel}>Mode</div>
+          </div>
+          <div style={PANEL_STYLES.resultItem}>
+            <div style={PANEL_STYLES.resultValue}>
+              L={result.block_entropies?.length - 1 || 0}
+            </div>
+            <div style={PANEL_STYLES.resultLabel}>Max L Computed</div>
           </div>
           <div style={PANEL_STYLES.resultItem}>
             <div style={PANEL_STYLES.resultValue}>
@@ -603,8 +692,11 @@ function ExcessEntropyPanel({ matrices, result, setResult }) {
           <div style={{ fontSize: '14px', maxWidth: '400px', textAlign: 'center' }}>
             Configure the parameters above and click "Compute Excess Entropy".
             <br/><br/>
-            <strong>Max Wait Time:</strong> If computing H(L) takes longer than this, 
-            switches to Monte Carlo sampling for all subsequent L values.
+            <strong>Time Constrained:</strong> Computes exact H(L) until time budget runs out,
+            then reports a lower bound on E.
+            <br/><br/>
+            <strong>Sample Constrained:</strong> Switches to Monte Carlo sampling when
+            exact computation becomes slow, continues to max block length.
           </div>
         </div>
       )}

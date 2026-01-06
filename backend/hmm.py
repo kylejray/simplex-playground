@@ -435,8 +435,22 @@ class HiddenMarkovModel:
             return -np.mean(log_probs)
         return 0.0
     
+    def _compute_lower_bound(self, H_L, H_L_minus_1, L):
+        """
+        Compute lower bound estimate on excess entropy using consecutive block entropies.
+
+        Uses the asymptotic formula H(L) ≈ h*L + E:
+        - h ≈ H(L) - H(L-1)
+        - E_lower ≈ H(L) - h*L
+
+        Returns (E_lower, h_estimate)
+        """
+        h_estimate = H_L - H_L_minus_1
+        E_lower = H_L - h_estimate * L
+        return E_lower, h_estimate
+
     def _finalize_excess_entropy(self, block_entropies, max_samples, mc_start_L):
-        
+
         """
         Compute final excess entropy and entropy rate from block entropies.
         Uses linear fit on last 2 points for h_mu: H(L) = h_mu * L + E

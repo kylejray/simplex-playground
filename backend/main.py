@@ -39,8 +39,10 @@ class PresetRequest(BaseModel):
 class ExcessEntropyRequest(BaseModel):
     matrices: list
     max_block_length: int = 20
-    max_time_per_L: float = 2.0  # seconds before switching to MC
-    mc_samples: int = 10000
+    max_time_per_L: float = 2.0  # seconds before switching to MC (sample_constrained mode)
+    mc_samples: int = 50000  # increased from 10000
+    sample_constrained: bool = False  # False = time constrained (default), True = MC fallback
+    time_budget: float = 10.0  # total time budget for time constrained mode
 
 def get_matrices_array(key, kwargs):
     if key == 'mess3':
@@ -122,43 +124,54 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
     """
     Compute excess entropy with streaming progress updates.
     Uses Server-Sent Events (SSE) to report progress for each L.
-    Switches from exact enumeration to Monte Carlo when a single L takes longer than max_time_per_L.
-    Sends heartbeat messages every 5 seconds during long computations to prevent proxy timeouts.
+
+    Two modes:
+    - Time Constrained (default): Stops when total time exceeds time_budget
+    - Sample Constrained: Switches to MC when a single L takes too long, continues to max_block_length
+
+    Sends heartbeat messages every 2 seconds during long computations to prevent proxy timeouts.
     """
     import concurrent.futures
-    
+
     async def generate():
         try:
             # Convert list back to numpy array
             matrix_params = np.array(request.matrices)
             hmm = HiddenMarkovModel(matrix_params)
-            
+
             block_entropies = [(0, 0.0, 'exact', 0.0)]  # (L, H, method, time)
             mc_start_L = None
             use_mc = False
             total_start = time.time()
-            
+            prev_H = 0.0  # H(L-1) for lower bound calculation
+
             # Use a thread pool to run blocking computations
             loop = asyncio.get_event_loop()
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            
+
             for L in range(1, request.max_block_length + 1):
+                # Time constrained mode: check total elapsed time before starting new L
+                if not request.sample_constrained:
+                    total_elapsed = time.time() - total_start
+                    if total_elapsed >= request.time_budget:
+                        break  # Stop - time budget exceeded
+
                 L_start = time.time()
-                
+
                 if not use_mc:
                     # Run exact enumeration in a thread so we can send heartbeats
                     future = loop.run_in_executor(
-                        executor, 
-                        hmm._compute_block_entropy_exact, 
+                        executor,
+                        hmm._compute_block_entropy_exact,
                         L
                     )
-                    
+
                     # Send heartbeats while waiting for computation
                     heartbeat_interval = 2.0  # seconds
                     while True:
                         try:
                             H_L = await asyncio.wait_for(
-                                asyncio.shield(future), 
+                                asyncio.shield(future),
                                 timeout=heartbeat_interval
                             )
                             break  # Computation finished
@@ -171,26 +184,26 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
                                 'method': 'exact'
                             }
                             yield f"data: {json.dumps(heartbeat)}\n\n"
-                    
+
                     L_time = time.time() - L_start
                     block_entropies.append((L, H_L, 'exact', L_time))
-                    
-                    # Check if this took too long - switch to MC for future L
-                    if L_time > request.max_time_per_L:
+
+                    # Sample constrained mode: switch to MC if this L took too long
+                    if request.sample_constrained and L_time > request.max_time_per_L:
                         use_mc = True
                         mc_start_L = L + 1
                 else:
-                    # Use Monte Carlo (also in thread for consistency)
+                    # Use Monte Carlo (sample constrained mode only)
                     if mc_start_L is None:
                         mc_start_L = L
-                    
+
                     future = loop.run_in_executor(
                         executor,
                         hmm._compute_block_entropy_mc,
                         L,
                         request.mc_samples
                     )
-                    
+
                     # Send heartbeats while waiting
                     heartbeat_interval = 2.0
                     while True:
@@ -208,44 +221,59 @@ async def compute_excess_entropy(request: ExcessEntropyRequest):
                                 'method': 'mc'
                             }
                             yield f"data: {json.dumps(heartbeat)}\n\n"
-                    
+
                     L_time = time.time() - L_start
                     block_entropies.append((L, H_L, 'mc', L_time))
-                
-                # Send progress update
+
+                # Compute lower bound estimate using H(L) and H(L-1)
+                E_lower, h_estimate = hmm._compute_lower_bound(H_L, prev_H, L)
+                prev_H = H_L  # Update for next iteration
+
+                # Send progress update with E_lower
                 progress = {
                     'type': 'progress',
                     'L': L,
                     'H': H_L,
                     'method': 'mc' if (use_mc or (mc_start_L and L >= mc_start_L)) else 'exact',
-                    'time': L_time
+                    'time': L_time,
+                    'E_lower': E_lower,
+                    'h_estimate': h_estimate
                 }
                 yield f"data: {json.dumps(progress)}\n\n"
                 await asyncio.sleep(0)  # Allow other tasks to run
-            
+
             executor.shutdown(wait=False)
-            
+
             # Compute final result
             result = hmm._finalize_excess_entropy(
                 [(L, H, m) for L, H, m, t in block_entropies],
                 request.mc_samples,
                 mc_start_L
             )
-            
-            # Add timing info to block entropies
+
+            # Add timing info and lower bound to result
             result['block_entropies'] = [(L, H, m, t) for L, H, m, t in block_entropies]
             result['computation_time'] = time.time() - total_start
-            
+            result['mode'] = 'sample_constrained' if request.sample_constrained else 'time_constrained'
+
+            # Add final E_lower from last two block entropies
+            if len(block_entropies) >= 2:
+                L_final, H_final, _, _ = block_entropies[-1]
+                _, H_prev, _, _ = block_entropies[-2]
+                E_lower_final, h_final = hmm._compute_lower_bound(H_final, H_prev, L_final)
+                result['E_lower'] = E_lower_final
+                result['h_estimate'] = h_final
+
             # Send final result
             final = {'type': 'result', 'data': result}
             yield f"data: {json.dumps(final)}\n\n"
-            
+
         except Exception as e:
             import traceback
             traceback.print_exc()
             error = {'type': 'error', 'message': str(e)}
             yield f"data: {json.dumps(error)}\n\n"
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
