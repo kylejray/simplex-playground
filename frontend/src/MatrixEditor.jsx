@@ -110,7 +110,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
   );
 
   // Dynamic state labels based on number of states
-  const stateLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const stateLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
   const states = stateLabels.slice(0, numStates);
   const is3State = numStates === 3;
   
@@ -127,7 +127,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
       matrices[selectedSymbol].forEach((row, r) => {
           row.forEach((val, c) => {
               const weight = parseFloat(val) || 0;
-              totalFlow += prevBelief[r] * weight;
+              totalFlow += (prevBelief[r] || 0) * weight;
           });
       });
   }
@@ -328,6 +328,7 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
               <option value="rrxor">RRXOR (5-state, E=2)</option>
             </optgroup>
             <optgroup label="3-State Processes">
+              <option value="fern">Fern</option>
               <option value="mess3">Mess 3</option>
               <option value="left_right_mix">Left/Right Mix</option>
               <option value="cyclic_rank1">Cyclic Rank-1</option>
@@ -335,10 +336,31 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
               <option value="abc_ratio">ABC Ratio</option>
               <option value="rank1_predefined">Rank-1 (Predefined)</option>
               <option value="rank1-xmas">Rank-1 (Xmas)</option>
+              <option value="smiley">Smiley Face</option>
+              <option value="smiley_nested">Nested Smiley</option>
+              <option value="smiley_9state">Smiley (9-State)</option>
+              <option value="parabolic_curve">Parabolic Curve</option>
             </optgroup>
             <option value="custom">Custom</option>
           </select>
         </div>
+
+        {config.preset === 'fern' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label style={{ fontWeight: 600, color: '#555', minWidth: '20px' }}>X:</label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              name="x"
+              value={config.x}
+              onChange={handleConfigChange}
+              style={{ width: '120px' }}
+            />
+            <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.x}</span>
+          </div>
+        )}
 
         {config.preset === 'mess3' && (
           <>
@@ -714,10 +736,261 @@ const MatrixEditor = ({ matrices, onChange, config, onConfigChange, selectedSymb
           </>
         )}
         
+        {config.preset === 'smiley' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '70px' }}>Curvature:</label>
+              <input
+                type="range" min="0.01" max="0.15" step="0.005"
+                name="curvature"
+                value={config.curvature !== undefined ? config.curvature : 0.06}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.curvature !== undefined ? config.curvature : 0.06}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '70px' }}>Depth:</label>
+              <input
+                type="range" min="0.05" max="0.25" step="0.005"
+                name="depth"
+                value={config.depth !== undefined ? config.depth : 0.12}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.depth !== undefined ? config.depth : 0.12}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '70px' }}>Eye Height:</label>
+              <input
+                type="range" min="0.50" max="0.90" step="0.01"
+                name="eye_height"
+                value={config.eye_height !== undefined ? config.eye_height : 0.70}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_height !== undefined ? config.eye_height : 0.70}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '70px' }}>Eye Spread:</label>
+              <input
+                type="range" min="0.02" max="0.25" step="0.01"
+                name="eye_spread"
+                value={config.eye_spread !== undefined ? config.eye_spread : 0.14}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_spread !== undefined ? config.eye_spread : 0.14}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '70px' }}>Eye Isolation:</label>
+              <input
+                type="range" min="0" max="0.95" step="0.05"
+                name="eye_isolation"
+                value={config.eye_isolation !== undefined ? config.eye_isolation : 0.85}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_isolation !== undefined ? config.eye_isolation : 0.85}</span>
+            </div>
+          </>
+        )}
+
+        {config.preset === 'smiley_nested' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Curvature:</label>
+              <input
+                type="range" min="0.01" max="0.15" step="0.005"
+                name="curvature"
+                value={config.curvature !== undefined ? config.curvature : 0.06}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.curvature !== undefined ? config.curvature : 0.06}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Depth:</label>
+              <input
+                type="range" min="0.05" max="0.25" step="0.005"
+                name="depth"
+                value={config.depth !== undefined ? config.depth : 0.12}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.depth !== undefined ? config.depth : 0.12}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Eye Height:</label>
+              <input
+                type="range" min="0.50" max="0.90" step="0.01"
+                name="eye_height"
+                value={config.eye_height !== undefined ? config.eye_height : 0.76}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_height !== undefined ? config.eye_height : 0.76}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Eye Size:</label>
+              <input
+                type="range" min="0.02" max="0.15" step="0.01"
+                name="eye_size"
+                value={config.eye_size !== undefined ? config.eye_size : 0.06}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_size !== undefined ? config.eye_size : 0.06}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Eye Sep:</label>
+              <input
+                type="range" min="0.05" max="0.30" step="0.01"
+                name="eye_separation"
+                value={config.eye_separation !== undefined ? config.eye_separation : 0.16}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_separation !== undefined ? config.eye_separation : 0.16}</span>
+            </div>
+          </>
+        )}
+
+        {config.preset === 'smiley_9state' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Curvature:</label>
+              <input
+                type="range" min="0.01" max="0.15" step="0.005"
+                name="curvature"
+                value={config.curvature !== undefined ? config.curvature : 0.06}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.curvature !== undefined ? config.curvature : 0.06}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Depth:</label>
+              <input
+                type="range" min="0.05" max="0.25" step="0.005"
+                name="depth"
+                value={config.depth !== undefined ? config.depth : 0.12}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.depth !== undefined ? config.depth : 0.12}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Eye Height:</label>
+              <input
+                type="range" min="0.50" max="0.90" step="0.01"
+                name="eye_height"
+                value={config.eye_height !== undefined ? config.eye_height : 0.76}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_height !== undefined ? config.eye_height : 0.76}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Eye Size:</label>
+              <input
+                type="range" min="0.01" max="0.10" step="0.005"
+                name="eye_size"
+                value={config.eye_size !== undefined ? config.eye_size : 0.04}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_size !== undefined ? config.eye_size : 0.04}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Eye Sep:</label>
+              <input
+                type="range" min="0.02" max="0.12" step="0.005"
+                name="eye_separation"
+                value={config.eye_separation !== undefined ? config.eye_separation : 0.08}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.eye_separation !== undefined ? config.eye_separation : 0.08}</span>
+            </div>
+          </>
+        )}
+
+        {config.preset === 'parabolic_curve' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Attr Height:</label>
+              <input
+                type="range" min="0.05" max="0.95" step="0.01"
+                name="attr_height"
+                value={config.attr_height !== undefined ? config.attr_height : 0.15}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.attr_height !== undefined ? config.attr_height : 0.15}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Attr Lean:</label>
+              <input
+                type="range" min="-0.80" max="0.80" step="0.01"
+                name="attr_lean"
+                value={config.attr_lean !== undefined ? config.attr_lean : 0.0}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.attr_lean !== undefined ? config.attr_lean : 0.0}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Start Height:</label>
+              <input
+                type="range" min="0.05" max="0.95" step="0.01"
+                name="start_height"
+                value={config.start_height !== undefined ? config.start_height : 0.70}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.start_height !== undefined ? config.start_height : 0.70}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Spread:</label>
+              <input
+                type="range" min="0.00" max="0.45" step="0.01"
+                name="spread"
+                value={config.spread !== undefined ? config.spread : 0.25}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.spread !== undefined ? config.spread : 0.25}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Speed:</label>
+              <input
+                type="range" min="0.02" max="0.40" step="0.01"
+                name="speed"
+                value={config.speed !== undefined ? config.speed : 0.12}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.speed !== undefined ? config.speed : 0.12}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 600, color: '#555', minWidth: '80px' }}>Shape:</label>
+              <input
+                type="range" min="0.5" max="4.0" step="0.1"
+                name="shape"
+                value={config.shape !== undefined ? config.shape : 2.0}
+                onChange={handleConfigChange}
+                style={{ width: '100px' }}
+              />
+              <span style={{ fontFamily: 'monospace', width: '40px' }}>{config.shape !== undefined ? config.shape : 2.0}</span>
+            </div>
+          </>
+        )}
+
         <div style={{ flex: 1 }}></div>
-        
-        <div style={{ 
-            fontSize: '0.9em', 
+
+        <div style={{
+            fontSize: '0.9em',
             color: '#666', 
             fontStyle: 'italic' 
         }}>

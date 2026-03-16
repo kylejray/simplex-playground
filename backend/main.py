@@ -65,6 +65,16 @@ def get_matrices_array(key, kwargs):
         return matrices.golden_mean(**kwargs)
     if key == 'rrxor':
         return matrices.rrxor()
+    if key == 'fern':
+        return matrices.fern(**kwargs)
+    if key == 'smiley':
+        return matrices.smiley(**kwargs)
+    if key == 'smiley_nested':
+        return matrices.smiley_nested(**kwargs)
+    if key == 'smiley_9state':
+        return matrices.smiley_9state(**kwargs)
+    if key == 'parabolic_curve':
+        return matrices.parabolic_curve(**kwargs)
     raise ValueError(f"Unknown matrix key: {key}")
 
 @app.post("/get_preset")

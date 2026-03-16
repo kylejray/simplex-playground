@@ -458,5 +458,457 @@ def rank1_xmas(scale_a: float = 0.9, scale_b: float = 0.9,
     final_matrices = np.zeros_like(raw_matrices)
     for k in range(3):
         final_matrices[k] = raw_matrices[k] + (1/3) * T
-        
+
     return final_matrices
+
+
+def fern(x: float = 0.5) -> np.ndarray:
+    """Creates a transition matrix for the Fern Process.
+
+    2 symbols, 3 states. Parameter x in [0, 1].
+    """
+    assert 0.0 <= x <= 1.0
+    return np.array([
+        [[0.3942, 0.00512, 0.0381],
+         [0.0, 0.53, 0.0],
+         [0.0, 0.326 * x, 0.554]],
+        [[0.3358, 0.01088, 0.2159],
+         [0.0, 0.0, 0.47],
+         [0.12, 0.326 * (1 - x), 0.0]],
+    ])
+
+
+def smiley(
+    curvature: float = 0.06,
+    depth: float = 0.12,
+    eye_height: float = 0.70,
+    eye_spread: float = 0.14,
+    eye_isolation: float = 0.85,
+    **kwargs,
+) -> np.ndarray:
+    """
+    Smiley face on the simplex via reset symbols + two-timescale smile dynamics.
+
+    The smile is a parabolic U-curve from two timescales:
+      - Slow A↔B exchange (curvature) → horizontal convergence
+      - Fast C drain (depth) → vertical drop
+
+    Reset symbols snap belief to fixed target distributions (eyes, smile corners).
+    State-dependent emission (eye_isolation) prevents smile symbol from being
+    emitted when belief is near eyes (high C), keeping eyes visually disjoint.
+
+    6 symbols: smile, left_start, right_start, left_eye, right_eye, noise
+
+    Args:
+        curvature: A↔B exchange rate. Higher = arms converge faster (0.01-0.15)
+        depth: C drain rate. Higher = deeper smile (0.05-0.25)
+        eye_height: C component of eye positions. Higher = eyes further up (0.5-0.9)
+        eye_spread: A-B asymmetry of eyes. Higher = eyes further apart (0.05-0.30)
+        eye_isolation: 0=uniform emission, 1=smile never emits from C (0-1)
+    """
+    c_leak = min(curvature * 0.3, 0.03)  # small leak proportional to exchange
+
+    # Smile transition matrix
+    T_smile = np.array([
+        [1 - curvature - c_leak, curvature, c_leak],
+        [curvature, 1 - curvature - c_leak, c_leak],
+        [depth, depth, 1 - 2 * depth],
+    ])
+
+    # Smile start positions (corners of the U)
+    smile_c = eye_height - 0.10  # slightly below eyes
+    smile_spread = eye_spread + 0.15  # wider than eyes
+    left_start = np.array([0.5 * (1 - smile_c) + smile_spread,
+                           0.5 * (1 - smile_c) - smile_spread,
+                           smile_c])
+    right_start = np.array([0.5 * (1 - smile_c) - smile_spread,
+                            0.5 * (1 - smile_c) + smile_spread,
+                            smile_c])
+    left_start = np.clip(left_start, 0.01, None)
+    right_start = np.clip(right_start, 0.01, None)
+    left_start /= left_start.sum()
+    right_start /= right_start.sum()
+
+    # Eye positions
+    eye_ab = (1.0 - eye_height) / 2.0
+    left_eye = np.array([eye_ab + eye_spread, eye_ab - eye_spread, eye_height])
+    right_eye = np.array([eye_ab - eye_spread, eye_ab + eye_spread, eye_height])
+    left_eye = np.clip(left_eye, 0.01, None)
+    right_eye = np.clip(right_eye, 0.01, None)
+    left_eye /= left_eye.sum()
+    right_eye /= right_eye.sum()
+
+    # State-dependent emission weights
+    base_smile = 0.80
+    w_smile = np.array([base_smile, base_smile,
+                        base_smile * (1.0 - eye_isolation)])
+    remaining = 1.0 - w_smile
+    w_per_reset = remaining / 5.0  # 4 resets + 1 noise
+
+    # Smile symbol (state-dependent weight)
+    T0 = T_smile * w_smile[:, None]
+
+    # Reset symbols: T[k, i, j] = w_per_reset[i] * target[j]
+    targets = [left_start, right_start, left_eye, right_eye]
+    symbol_matrices = [T0]
+    for target in targets:
+        v = target / target.sum()
+        Tk = w_per_reset[:, None] * np.tile(v, (3, 1))
+        symbol_matrices.append(Tk)
+
+    # Noise symbol (uniform reset)
+    v_noise = np.ones(3) / 3.0
+    T_noise = w_per_reset[:, None] * np.tile(v_noise, (3, 1))
+    symbol_matrices.append(T_noise)
+
+    T = np.array(symbol_matrices)
+
+    # Verify
+    net = T.sum(axis=0)
+    assert np.allclose(net.sum(axis=1), 1.0), f"Row sums: {net.sum(axis=1)}"
+    assert np.all(T >= -1e-10), f"Negative entries!"
+
+    return T
+
+
+def smiley_nested(
+    curvature: float = 0.06,
+    depth: float = 0.12,
+    eye_height: float = 0.76,
+    eye_size: float = 0.06,
+    eye_separation: float = 0.16,
+    **kwargs,
+) -> np.ndarray:
+    """
+    Nested smiley: mouth U-curve + eye V-curves using two dynamics symbols.
+
+    The mouth dynamics has attractor at low C (bottom of simplex).
+    The eye dynamics has attractor at high C (top of simplex).
+    Eyes are miniature V-curves that stay compact near the top.
+
+    9 symbols: mouth_dyn, eye_dyn, 4 eye arm resets, 2 mouth resets, noise
+
+    Args:
+        curvature: Mouth A↔B exchange rate (0.02-0.12)
+        depth: Mouth C drain rate (0.05-0.20)
+        eye_height: C position for eyes, higher = further up (0.60-0.85)
+        eye_size: Spread of each eye V, higher = wider eyes (0.02-0.12)
+        eye_separation: Offset between eyes, higher = further apart (0.06-0.20)
+    """
+    leak = 0.02
+
+    # --- Mouth dynamics: attractor at low C ---
+    T_mouth = np.array([
+        [1 - curvature - leak, curvature, leak],
+        [curvature, 1 - curvature - leak, leak],
+        [depth, depth, 1 - 2 * depth],
+    ])
+
+    # --- Eye dynamics: attractor at high C (leak >> drain) ---
+    eye_alpha = 0.06
+    eye_drain = 0.03
+    # Derive eye_leak so attractor C ≈ eye_height
+    # π_C = eye_leak / (eye_leak + 2*eye_drain), solve for eye_leak:
+    target_pi_c = min(eye_height, 0.90)
+    eye_leak = target_pi_c * 2 * eye_drain / (1 - target_pi_c)
+    eye_leak = np.clip(eye_leak, 0.02, 0.40)
+
+    T_eye = np.array([
+        [1 - eye_alpha - eye_leak, eye_alpha, eye_leak],
+        [eye_alpha, 1 - eye_alpha - eye_leak, eye_leak],
+        [eye_drain, eye_drain, 1 - 2 * eye_drain],
+    ])
+
+    # --- Mouth starting positions (symmetric) ---
+    mc = depth + 0.30  # mouth C derived from depth
+    mc = np.clip(mc, 0.30, 0.55)
+    mc_center = (1 - mc) / 2
+    mouth_spread = 0.24
+    mouth_L = np.array([mc_center + mouth_spread, mc_center - mouth_spread, mc])
+    mouth_R = np.array([mc_center - mouth_spread, mc_center + mouth_spread, mc])
+    for v in [mouth_L, mouth_R]:
+        v[:] = np.clip(v, 0.01, None)
+        v /= v.sum()
+
+    # --- Eye starting positions (4 arms: 2 per eye) ---
+    ec = eye_height
+    ec_center = (1 - ec) / 2
+    eoff = eye_separation
+    espread = eye_size
+
+    eye_L_outer = np.array([ec_center + eoff + espread,
+                            ec_center - eoff - espread, ec])
+    eye_L_inner = np.array([ec_center + eoff - espread,
+                            ec_center - eoff + espread, ec])
+    eye_R_inner = np.array([ec_center - eoff + espread,
+                            ec_center + eoff - espread, ec])
+    eye_R_outer = np.array([ec_center - eoff - espread,
+                            ec_center + eoff + espread, ec])
+
+    eye_targets = [eye_L_outer, eye_L_inner, eye_R_inner, eye_R_outer]
+    for v in eye_targets:
+        v[:] = np.clip(v, 0.01, None)
+        v /= v.sum()
+
+    # --- State-dependent emission weights ---
+    # Mouth dyn: suppressed at high C (eye territory)
+    # Eye dyn: suppressed at low C (mouth territory)
+    isolation = 0.85
+    w_mouth = np.array([0.35, 0.35, 0.35 * (1 - isolation)])
+    w_eye = np.array([0.15 * (1 - isolation), 0.15 * (1 - isolation), 0.15])
+    w_reset = (1.0 - w_mouth - w_eye) / 7.0  # 6 resets + 1 noise
+
+    # --- Build symbol matrices ---
+    symbols = []
+
+    # Symbol 0: mouth dynamics
+    symbols.append(T_mouth * w_mouth[:, None])
+
+    # Symbol 1: eye dynamics
+    symbols.append(T_eye * w_eye[:, None])
+
+    # Symbols 2-3: mouth resets
+    for target in [mouth_L, mouth_R]:
+        symbols.append(w_reset[:, None] * np.tile(target, (3, 1)))
+
+    # Symbols 4-7: eye arm resets
+    for target in eye_targets:
+        symbols.append(w_reset[:, None] * np.tile(target, (3, 1)))
+
+    # Symbol 8: noise
+    symbols.append(w_reset[:, None] * np.tile(np.ones(3) / 3.0, (3, 1)))
+
+    T = np.array(symbols)
+
+    # Verify
+    net = T.sum(axis=0)
+    assert np.allclose(net.sum(axis=1), 1.0, atol=1e-6), f"Row sums: {net.sum(axis=1)}"
+    assert np.all(T >= -1e-10), f"Negative entries!"
+
+    return T
+
+
+def smiley_9state(
+    curvature: float = 0.06,
+    depth: float = 0.12,
+    eye_height: float = 0.76,
+    eye_size: float = 0.04,
+    eye_separation: float = 0.08,
+    **kwargs,
+) -> np.ndarray:
+    """
+    9-state smiley face on the simplex via 3 independent triplet subspaces.
+
+    States 0-2: mouth (A, B, C)
+    States 3-5: left eye (A', B', C')
+    States 6-8: right eye (A'', B'', C'')
+
+    Marginalization: p̃_A = b_0+b_3+b_6, p̃_B = b_1+b_4+b_7, p̃_C = b_2+b_5+b_8
+
+    9 symbols: mouth_dyn, left_eye_dyn, right_eye_dyn,
+               mouth_reset_L, mouth_reset_R,
+               left_eye_outer, left_eye_inner,
+               right_eye_outer, right_eye_inner
+
+    Args:
+        curvature: Mouth A↔B exchange rate α (0.01-0.15)
+        depth: Mouth C drain rate β (0.05-0.25)
+        eye_height: C component of eye attractor (0.50-0.90)
+        eye_size: Spread of each eye V-arm (0.01-0.10)
+        eye_separation: Left-right offset of eyes (0.02-0.12)
+    """
+    # --- Mouth dynamics (3x3) ---
+    # For a smile (U-shape), C drain must be FASTER than A↔B exchange
+    # so C drops first then arms converge → parabolic concave-up shape.
+    # Scale rates up so the curve is traced in ~3-4 dynamics steps.
+    leak = 0.02
+    rate_scale = 2.0
+    exchange = curvature * rate_scale  # A↔B rate
+    drain = depth * rate_scale         # C→A,B rate (faster → U-shape)
+
+    T_mouth = np.array([
+        [1 - exchange - leak, exchange, leak],
+        [exchange, 1 - exchange - leak, leak],
+        [drain, drain, 1 - 2 * drain],
+    ])
+
+    # --- Eye dynamics (two 3x3 matrices, detailed balance) ---
+    c_e = eye_height
+    half = (1.0 - c_e) / 2.0
+
+    # Derive eye rates for V-curve (shape ≈ 1: equal eigenvalue decay)
+    beta_e = 0.06
+    alpha_e = min(beta_e / max(1.0 - c_e, 0.05), 0.5)
+
+    # Left eye attractor: lean left (more A than B)
+    a_le = max(0.01, half + eye_separation)
+    b_le = max(0.01, half - eye_separation)
+    pi_le = np.array([a_le, b_le, c_e])
+    pi_le /= pi_le.sum()
+    a_le, b_le, c_le = pi_le
+
+    T_left_eye = np.array([
+        [1 - alpha_e * b_le - beta_e * c_le, alpha_e * b_le, beta_e * c_le],
+        [alpha_e * a_le, 1 - alpha_e * a_le - beta_e * c_le, beta_e * c_le],
+        [beta_e * a_le, beta_e * b_le, 1 - beta_e * (1.0 - c_le)],
+    ])
+
+    # Right eye attractor: lean right (more B than A)
+    a_re = max(0.01, half - eye_separation)
+    b_re = max(0.01, half + eye_separation)
+    pi_re = np.array([a_re, b_re, c_e])
+    pi_re /= pi_re.sum()
+    a_re, b_re, c_re = pi_re
+
+    T_right_eye = np.array([
+        [1 - alpha_e * b_re - beta_e * c_re, alpha_e * b_re, beta_e * c_re],
+        [alpha_e * a_re, 1 - alpha_e * a_re - beta_e * c_re, beta_e * c_re],
+        [beta_e * a_re, beta_e * b_re, 1 - beta_e * (1.0 - c_re)],
+    ])
+
+    # --- Mouth reset targets (arms of the U) ---
+    mouth_start_c = 0.35
+    mc = (1.0 - mouth_start_c) / 2.0
+    ms = 0.20
+    mouth_L = np.array([mc + ms, mc - ms, mouth_start_c])
+    mouth_R = np.array([mc - ms, mc + ms, mouth_start_c])
+    for v in [mouth_L, mouth_R]:
+        v[:] = np.clip(v, 0.01, None)
+        v /= v.sum()
+
+    # --- Eye reset targets (arms of each V) ---
+    eye_L_outer = np.array([max(0.01, half + eye_separation + eye_size),
+                            max(0.01, half - eye_separation - eye_size), c_e])
+    eye_L_inner = np.array([max(0.01, half + eye_separation - eye_size),
+                            max(0.01, half - eye_separation + eye_size), c_e])
+    eye_R_outer = np.array([max(0.01, half - eye_separation - eye_size),
+                            max(0.01, half + eye_separation + eye_size), c_e])
+    eye_R_inner = np.array([max(0.01, half - eye_separation + eye_size),
+                            max(0.01, half + eye_separation - eye_size), c_e])
+    for v in [eye_L_outer, eye_L_inner, eye_R_outer, eye_R_inner]:
+        v[:] = np.clip(v, 0.01, None)
+        v /= v.sum()
+
+    # --- Emission weights ---
+    weights = [0.40, 0.08, 0.08, 0.08, 0.08, 0.07, 0.07, 0.07, 0.07]
+
+    # --- Build 9x9 symbol matrices ---
+    symbols = []
+
+    # Symbol 0: Mouth dynamics (block 0)
+    S = np.eye(9)
+    S[0:3, 0:3] = T_mouth
+    symbols.append(S * weights[0])
+
+    # Symbol 1: Left eye dynamics (block 1)
+    S = np.eye(9)
+    S[3:6, 3:6] = T_left_eye
+    symbols.append(S * weights[1])
+
+    # Symbol 2: Right eye dynamics (block 2)
+    S = np.eye(9)
+    S[6:9, 6:9] = T_right_eye
+    symbols.append(S * weights[2])
+
+    # Symbols 3-8: Reset symbols (rank-1, target specific subspace)
+    reset_specs = [
+        (mouth_L, 0),       # 3: Mouth reset L
+        (mouth_R, 0),       # 4: Mouth reset R
+        (eye_L_outer, 1),   # 5: Left eye reset outer
+        (eye_L_inner, 1),   # 6: Left eye reset inner
+        (eye_R_outer, 2),   # 7: Right eye reset outer
+        (eye_R_inner, 2),   # 8: Right eye reset inner
+    ]
+    for idx, (target, block) in enumerate(reset_specs):
+        R = np.zeros((9, 9))
+        s = block * 3
+        for i in range(9):
+            R[i, s:s + 3] = target
+        symbols.append(R * weights[3 + idx])
+
+    T = np.array(symbols)
+
+    # Verify
+    net = T.sum(axis=0)
+    assert np.allclose(net.sum(axis=1), 1.0, atol=1e-6), f"Row sums: {net.sum(axis=1)}"
+    assert np.all(T >= -1e-10), f"Negative entries!"
+
+    return T
+
+
+def parabolic_curve(
+    attr_height: float = 0.15,
+    attr_lean: float = 0.0,
+    start_height: float = 0.70,
+    spread: float = 0.25,
+    speed: float = 0.12,
+    shape: float = 2.0,
+    **kwargs,
+) -> np.ndarray:
+    """
+    Parabolic curve toward a controllable attractor on the 3-simplex.
+
+    4 symbols: dynamics, reset_left, reset_right, noise.
+
+    The dynamics matrix uses a detailed-balance construction with
+    eigenvalue structure controlled by (speed, shape). shape=2 gives
+    parabolic curves; shape=1 gives straight-line convergence.
+    """
+    # --- Attractor ---
+    c = np.clip(attr_height, 0.05, 0.95)
+    lean = np.clip(attr_lean, -0.80, 0.80)
+    remaining = 1.0 - c
+    a = remaining * (1.0 - lean) / 2.0
+    b = remaining * (1.0 + lean) / 2.0
+    a = np.clip(a, 0.01, None)
+    b = np.clip(b, 0.01, None)
+    pi = np.array([a, b, c])
+    pi /= pi.sum()
+    a, b, c = pi
+
+    # --- Dynamics eigenvalues ---
+    beta = np.clip(speed, 0.02, 0.40)
+    r = np.clip(shape, 0.5, 4.0)
+
+    # lambda_C = 1 - beta
+    # lambda_AB = lambda_C^(1/r)
+    # alpha = (1 - beta*c - lambda_AB) / (1 - c)
+    lambda_AB = (1.0 - beta) ** (1.0 / r)
+    alpha = (1.0 - beta * c - lambda_AB) / (1.0 - c) if (1.0 - c) > 1e-9 else beta
+
+    # Clip alpha so all T_dyn entries stay non-negative
+    alpha_max = (1.0 - beta * c) / max(a, b)
+    alpha = np.clip(alpha, 0.0, alpha_max - 1e-9)
+
+    # --- Build dynamics matrix (detailed balance) ---
+    T_dyn = np.array([
+        [1 - alpha * b - beta * c, alpha * b,               beta * c],
+        [alpha * a,                1 - alpha * a - beta * c, beta * c],
+        [beta * a,                 beta * b,                 1 - beta * (1 - c)],
+    ])
+
+    # --- Start points (mirrored across A=B line) ---
+    sc = np.clip(start_height, 0.05, 0.95)
+    sp = np.clip(spread, 0.0, 0.45)
+    start_L = np.array([(1 - sc) * (0.5 + sp), (1 - sc) * (0.5 - sp), sc])
+    start_R = np.array([(1 - sc) * (0.5 - sp), (1 - sc) * (0.5 + sp), sc])
+    for v in [start_L, start_R]:
+        v[:] = np.clip(v, 0.01, None)
+        v /= v.sum()
+
+    # --- Emission weights (state-independent) ---
+    w_dyn = 0.80
+    w_reset = 0.10
+
+    symbols = [
+        T_dyn * w_dyn,
+        w_reset * np.tile(start_L, (3, 1)),
+        w_reset * np.tile(start_R, (3, 1)),
+    ]
+
+    T = np.array(symbols)
+    net = T.sum(axis=0)
+    assert np.allclose(net.sum(axis=1), 1.0, atol=1e-6), f"Row sums: {net.sum(axis=1)}"
+    assert np.all(T >= -1e-10), f"Negative entries!"
+
+    return T

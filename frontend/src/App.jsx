@@ -100,9 +100,14 @@ function App() {
         abc_ratio: { ratio_a: 20, ratio_b: 6, ratio_c: 6, ratio_d: 6, ratio_e: 1, ratio_f: 1 },
         rank1_predefined: { p_scale: 0.5, a: 0.5, ratio_a: 1, ratio_b: 1, ratio_c: 1 },
         'rank1-xmas': { scale_a: 0.9, scale_b: 0.9, s1: 0.5, s2: 0.5, s3: 0.5, ratio_a: 11, ratio_b: 7, ratio_c: 7 },
+        fern: { x: 0.5 },
         even_process: { p: 0.5 },
         golden_mean: { p: 0.5 },
         rrxor: {},
+        smiley: { curvature: 0.06, depth: 0.12, eye_height: 0.70, eye_spread: 0.14, eye_isolation: 0.85 },
+        smiley_nested: { curvature: 0.06, depth: 0.12, eye_height: 0.76, eye_size: 0.06, eye_separation: 0.16 },
+        smiley_9state: { curvature: 0.06, depth: 0.12, eye_height: 0.76, eye_size: 0.04, eye_separation: 0.08 },
+        parabolic_curve: { attr_height: 0.15, attr_lean: 0.0, start_height: 0.70, spread: 0.25, speed: 0.12, shape: 2.0 },
         custom: {}
     },
     generation_mode: 'random', // 'random' or 'systematic'
@@ -193,6 +198,43 @@ function App() {
             ratio_b: parseFloat(config.ratio_b || 7),
             ratio_c: parseFloat(config.ratio_c || 7)
           };
+        } else if (config.preset === 'smiley') {
+          payload.kwargs = {
+            curvature: parseFloat(config.curvature || 0.06),
+            depth: parseFloat(config.depth || 0.12),
+            eye_height: parseFloat(config.eye_height || 0.70),
+            eye_spread: parseFloat(config.eye_spread || 0.14),
+            eye_isolation: parseFloat(config.eye_isolation || 0.85),
+          };
+        } else if (config.preset === 'smiley_nested') {
+          payload.kwargs = {
+            curvature: parseFloat(config.curvature || 0.06),
+            depth: parseFloat(config.depth || 0.12),
+            eye_height: parseFloat(config.eye_height || 0.76),
+            eye_size: parseFloat(config.eye_size || 0.06),
+            eye_separation: parseFloat(config.eye_separation || 0.16),
+          };
+        } else if (config.preset === 'smiley_9state') {
+          payload.kwargs = {
+            curvature: parseFloat(config.curvature || 0.06),
+            depth: parseFloat(config.depth || 0.12),
+            eye_height: parseFloat(config.eye_height || 0.76),
+            eye_size: parseFloat(config.eye_size || 0.04),
+            eye_separation: parseFloat(config.eye_separation || 0.08),
+          };
+        } else if (config.preset === 'parabolic_curve') {
+          payload.kwargs = {
+            attr_height: parseFloat(config.attr_height || 0.15),
+            attr_lean: parseFloat(config.attr_lean || 0.0),
+            start_height: parseFloat(config.start_height || 0.70),
+            spread: parseFloat(config.spread || 0.25),
+            speed: parseFloat(config.speed || 0.12),
+            shape: parseFloat(config.shape || 2.0),
+          };
+        } else if (config.preset === 'fern') {
+          payload.kwargs = {
+            x: parseFloat(config.x || 0.5),
+          };
         }
         // even_process, golden_mean, and rrxor have no parameters
         
@@ -205,7 +247,7 @@ function App() {
     };
 
     fetchPreset();
-  }, [config.preset, config.x, config.y, config.a, config.b, config.p, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f, config.p_scale, config.n_scale, config.scale_a, config.scale_b, config.s1, config.s2, config.s3, config.generation_mode, config.max_words, config.max_len]);
+  }, [config.preset, config.x, config.y, config.a, config.b, config.p, config.n_states, config.n_symbols, config.state_decay, config.contrast, config.fuzziness, config.ratio_a, config.ratio_b, config.ratio_c, config.ratio_d, config.ratio_e, config.ratio_f, config.p_scale, config.n_scale, config.scale_a, config.scale_b, config.s1, config.s2, config.s3, config.curvature, config.depth, config.eye_height, config.eye_spread, config.eye_isolation, config.eye_size, config.eye_separation, config.attr_height, config.attr_lean, config.start_height, config.spread, config.speed, config.shape, config.generation_mode, config.max_words, config.max_len]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -230,7 +272,13 @@ function App() {
                      ratio_d: prev.ratio_d, ratio_e: prev.ratio_e, ratio_f: prev.ratio_f,
                      p_scale: prev.p_scale, n_scale: prev.n_scale,
                      scale_a: prev.scale_a, scale_b: prev.scale_b,
-                     s1: prev.s1, s2: prev.s2, s3: prev.s3
+                     s1: prev.s1, s2: prev.s2, s3: prev.s3,
+                     curvature: prev.curvature, depth: prev.depth,
+                     eye_height: prev.eye_height, eye_spread: prev.eye_spread, eye_isolation: prev.eye_isolation,
+                     eye_size: prev.eye_size, eye_separation: prev.eye_separation,
+                     attr_height: prev.attr_height, attr_lean: prev.attr_lean,
+                     start_height: prev.start_height, spread: prev.spread,
+                     speed: prev.speed, shape: prev.shape
                  };
             }
             
@@ -252,7 +300,7 @@ function App() {
             
             // Update the storage for the current preset immediately
             // This ensures state is consistent even if we don't switch presets
-            if (['x', 'y', 'a', 'b', 'n_states', 'n_symbols', 'state_decay', 'contrast', 'fuzziness', 'ratio_a', 'ratio_b', 'ratio_c', 'ratio_d', 'ratio_e', 'ratio_f', 'p_scale', 'n_scale', 'scale_a', 'scale_b', 's1', 's2', 's3', 'generation_mode', 'max_words', 'max_len'].includes(name) && prev.preset !== 'custom') {
+            if (['x', 'y', 'a', 'b', 'n_states', 'n_symbols', 'state_decay', 'contrast', 'fuzziness', 'ratio_a', 'ratio_b', 'ratio_c', 'ratio_d', 'ratio_e', 'ratio_f', 'p_scale', 'n_scale', 'scale_a', 'scale_b', 's1', 's2', 's3', 'curvature', 'depth', 'eye_height', 'eye_spread', 'eye_isolation', 'eye_size', 'eye_separation', 'attr_height', 'attr_lean', 'start_height', 'spread', 'speed', 'shape', 'generation_mode', 'max_words', 'max_len'].includes(name) && prev.preset !== 'custom') {
                 newState.presets = {
                     ...prev.presets,
                     [prev.preset]: {
@@ -312,13 +360,20 @@ function App() {
       };
 
       const response = await axios.post(`${API_URL}/generate`, payload);
-      
+
+      // Marginalize 9-state beliefs to 3D for simplex visualization
+      const shouldMarginalize = config.preset === 'smiley_9state';
+      const marg = (b) => {
+        if (!shouldMarginalize || !b || b.length !== 9) return b;
+        return [b[0]+b[3]+b[6], b[1]+b[4]+b[7], b[2]+b[5]+b[8]];
+      };
+
       setWords(response.data.words);
-      setBeliefStates(response.data.belief_states);
-      setConstrainedBeliefs(response.data.constrained_beliefs);
-      setInitialState(response.data.initial_state);
-      setFlatBeliefs(response.data.flat_beliefs);
-      setFlatConstrainedBeliefs(response.data.flat_constrained_beliefs);
+      setBeliefStates(response.data.belief_states.map(seq => seq.map(marg)));
+      setConstrainedBeliefs(response.data.constrained_beliefs.map(seq => seq.map(marg)));
+      setInitialState(marg(response.data.initial_state));
+      setFlatBeliefs(response.data.flat_beliefs.map(marg));
+      setFlatConstrainedBeliefs(response.data.flat_constrained_beliefs.map(marg));
       
     } catch (err) {
       console.error(err);
@@ -592,7 +647,7 @@ function App() {
                 )}
 
                 {/* Belief Visualizer (Inset top right) - only for 3-state machines */}
-                {matrices && matrices[0] && matrices[0].length === 3 && (
+                {matrices && matrices[0] && (matrices[0].length === 3 || config.preset === 'smiley_9state') && (
                 <div style={{
                     position: 'absolute',
                     top: '90px',
